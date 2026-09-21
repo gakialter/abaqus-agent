@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Abaqus runtime
+abaqus.rpy
+abaqus.rpy.*
+abaqus.rec
+abaqus*.rec
+abaqus_acis.log
+*.log
+
+# MCP workspace (runtime-generated, not source)
+mcp_home/
+work/
+validation/result_screenshot.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Third-party forks (not part of this repo)
+Abaqus_MCP/
+abaqus-mcp/
+abaqus_skills/

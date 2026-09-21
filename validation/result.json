@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-09-22T00:11:31+08:00",
+  "abaqus_version": "2026",
+  "bridge_version": "4.0.0",
+  "job_name": "CantileverJob",
+  "job_status": "COMPLETED",
+  "max_disp_mm": 0.40274,
+  "max_mises_MPa": 100.206,
+  "physics_sane": true,
+  "screenshot_path": "validation/result_screenshot.png",
+  "screenshot_size_bytes": 57584,
+  "ping_ok": true,
+  "build_ok": true,
+  "odb_read_ok": true,
+  "viewport_ok": true,
+  "overall_pass": true,
+  "notes": "Cantilever beam 100x10x10mm, Steel E=210000MPa nu=0.3, 50N corner loads. Tip displacement ~0.40mm, fixed-end Mises ~100MPa — matches hand-calc order of magnitude."
+}
