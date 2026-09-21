@@ -33,18 +33,11 @@ except ImportError:
 
 
 def _resolve_mcp_home():
-    """Resolve MCP home with explicit override support."""
     env_home = os.environ.get('ABAQUS_MCP_HOME', '').strip()
     if env_home:
         return os.path.abspath(os.path.expanduser(env_home))
-    try:
-        this_file = os.path.abspath(__file__)
-        script_dir = os.path.dirname(this_file)
-        if os.path.exists(os.path.join(script_dir, 'stop_mcp.py')):
-            return script_dir
-    except Exception:
-        pass
-    return os.path.join(os.path.expanduser('~'), '.abaqus-mcp')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, 'mcp_home')
 
 
 MCP_HOME = _resolve_mcp_home()
@@ -338,21 +331,14 @@ def get_viewport_image(viewport_name=None, width=800, height=600, fmt='PNG'):
             format=_fmt_map.get(fmt.upper(), PNG),
             canvasObjects=(session.viewports[vp_name],)
         )
-        # Discover the real on-disk file (printToFile may use .png/.svg/.tif).
-        ext_map = {'PNG': '.png', 'SVG': '.svg', 'TIFF': '.tif'}
+        # Only accept the file matching THIS img_base + expected extension.
+        # No fallback to historical viewport_* screenshots.
         found = None
-        candidate = img_base + ext_map.get(fmt.upper(), '.png')
-        if os.path.exists(candidate):
-            found = candidate
-        if found is None:
-            try:
-                cands = [os.path.join(SCREENSHOTS_DIR, f)
-                         for f in os.listdir(SCREENSHOTS_DIR)
-                         if f.startswith('viewport_')]
-                if cands:
-                    found = max(cands, key=os.path.getmtime)
-            except Exception:
-                pass
+        for ext in ('.png', '.svg', '.tif', '.tiff'):
+            candidate = img_base + ext
+            if os.path.exists(candidate):
+                found = candidate
+                break
         if found and os.path.exists(found):
             with open(found, 'rb') as f:
                 data = base64.b64encode(f.read()).decode('ascii')

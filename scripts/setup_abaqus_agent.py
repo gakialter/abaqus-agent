@@ -157,7 +157,14 @@ def main():
     print(f'3) Drive Abaqus directly:')
     print(f'     "{venv_py}" "{ws}\\client.py"   (then import client; send("execute_script", ...))')
     print()
-    print()
+    print("4) MCP client config (already generated, env embedded):")
+    print(f'     {ws}\\mcp_client_config.json')
+    print("     - Cursor: merge the mcpServers entry into .cursor/mcp.json")
+    print("     - Claude Desktop: merge it into claude_desktop_config.json")
+    print("     - Codex: copy command/args/env into config.toml [[mcp_servers]]")
+    print("     Nothing in your global agent config is modified automatically.")
+    print("=" * 64)
+
     if skill_copied:
         print("5) Skill installed at:")
         print(f'     {ws}\\SKILL.md')
@@ -166,14 +173,6 @@ def main():
         print("5) Skill (SKILL.md) was NOT bundled with this installer.")
         print("   Install it separately by cloning the repo and pointing your agent")
         print("   skill root at the repo directory that contains SKILL.md.")
-    print("=" * 64)
-
-    print("4) MCP client config (already generated, env embedded):")
-    print(f'     {ws}\\mcp_client_config.json')
-    print("     - Cursor: merge the mcpServers entry into .cursor/mcp.json")
-    print("     - Claude Desktop: merge it into claude_desktop_config.json")
-    print("     - Codex: copy command/args/env into config.toml [[mcp_servers]]")
-    print("     Nothing in your global agent config is modified automatically.")
     print("=" * 64)
 
 
