@@ -11,9 +11,9 @@
         "first_plastic_point_zero": true,
         "job_status": "COMPLETED",
         "nlgeom": "ON",
-        "max_mises_MPa": 250.0,
-        "max_PEEQ": 0.100447,
-        "note": "Mises pinned exactly at yield = plastic plateau reached; PEEQ output reads fine."
+        "mises_minmax_MPa": [250.0, 250.0],
+        "PEEQ_minmax_mean": [0.000489, 0.100447, 0.050644],
+        "note": "Mises is exactly 250 everywhere = plastic plateau reached. PEEQ max 0.100 is a LOCAL peak at the bottom constrained corner (barreling); the field MEAN 0.0506 is the representative value. Do not quote max PEEQ as the global strain."
       }
     },
     "B_nonlinear_static": {
@@ -27,13 +27,30 @@
     },
     "E_verification_RF_balance": {
       "status": "PASS",
-      "checks": {
+      "recheck_frame": "EppJob / step S1 / frame 13 of 13 / time=1.0 (single job, single frame)",
+      "geometry_verified": {
+        "initial_box_mm": [10.0, 10.0, 10.0],
+        "deformed_height_mm": 9.5,
+        "top_face_U3_mm": -0.5,
+        "bottom_face_U3_mm": 0.0,
+        "deformed_xy_bbox_mm": [10.4632, 10.4632],
+        "RF_xyz_N": [0.0, 0.0, 27557.091]
+      },
+      "stress_state_caveat": "Bottom face is ENCASTRE (u1=u2=u3=0): lateral expansion is frozen there while the free top expands, so the specimen BARRELS and the bottom face is triaxially stressed. This is NOT uniform uniaxial compression. Therefore sigma_y * area is only an order-of-magnitude check, NOT a tight benchmark. The tight check is PEEQ vs theory.",
+      "PEEQ_theory": {
+        "engineering_compression_e": 0.05,
+        "log_true_axial_strain": "ln(9.5/10) = 0.05129",
+        "elastic_strain_at_yield": "250/210000 = 0.001190",
+        "theoretical_PEEQ": 0.05010,
+        "measured_mean_PEEQ": 0.05064,
+        "error_pct": 1.08
+      },
+      "force_notes": {
         "RF3_total_N": 27557.09,
-        "naive_plateau_sigma_y_times_A": 25000.0,
+        "sigma_y_times_initial_area_N": 25000.0,
         "naive_pct": 10.23,
-        "true_stress_corrected_N": 27683.0,
-        "corrected_pct": 0.5,
-        "note": "The 10% gap vs sigma_y*initial_area(25000) is the EXPECTED nlgeom large-deformation effect: at 5% true compression current area grows ~5% (plastic incompressibility), so true-stress force ~27.7 kN. FE 27.56 kN matches within 0.5%. RF balance confirmed."
+        "incompressible_area_estimate_N": 26316.0,
+        "note": "The 10% above sigma_y*A0 is NOT a clean nlgeom area correction: the bottom contact area is pinned at 100 mm^2 by ENCASTRE, and excess force comes from end triaxiality/barreling. The uniform incompressibility estimate 250*100/0.95 = 26316 N also does not match because the field is non-uniform. Do not use sigma*current-area to back-fit the force; the PEEQ check above is the real verification. Lateral RF1=RF2=0 confirms transverse equilibrium."
       }
     },
     "C_contact": {
