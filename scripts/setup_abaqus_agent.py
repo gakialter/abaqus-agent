@@ -108,6 +108,20 @@ def main():
     launcher = LAUNCHER_TEMPLATE.replace("__WORKSPACE__", str(ws))
     (ws / "abaqus_start_mcp.py").write_text(launcher, encoding="utf-8")
 
+    # Emit a ready-to-use MCP client config (env embedded, no manual `set` needed).
+    import json as _json
+    venv_py = ws / ".venv" / "Scripts" / "python.exe"
+    mcp_cfg = {
+        "mcpServers": {
+            "abaqus": {
+                "command": str(venv_py),
+                "args": [str(ws / "mcp_server.py")],
+                "env": {"ABAQUS_MCP_HOME": str(ws / "mcp_home")},
+            }
+        }
+    }
+    (ws / "mcp_client_config.json").write_text(_json.dumps(mcp_cfg, indent=2), encoding="utf-8")
+
     venv_py = ws / ".venv" / "Scripts" / "python.exe"
     if not venv_py.exists():
         print("[4/5] Creating venv + installing mcp<2 (this may take a minute) ...")
@@ -131,8 +145,15 @@ def main():
     print(f'     set ABAQUS_MCP_HOME={ws}\\mcp_home')
     print(f'     "{venv_py}" "{ws}\\client.py"')
     print()
-    print(f'3) Drive Abaqus: import client; send("execute_script", script=...) etc.')
-    print(f'   For a standard MCP client (Cursor/Claude), run: "{venv_py}" "{ws}\\mcp_server.py"')
+    print(f'3) Drive Abaqus directly:')
+    print(f'     "{venv_py}" "{ws}\\client.py"   (then import client; send("execute_script", ...))')
+    print()
+    print("4) MCP client config (already generated, env embedded):")
+    print(f'     {ws}\\mcp_client_config.json')
+    print("     - Cursor: merge the mcpServers entry into .cursor/mcp.json")
+    print("     - Claude Desktop: merge it into claude_desktop_config.json")
+    print("     - Codex: copy command/args/env into config.toml [[mcp_servers]]")
+    print("     Nothing in your global agent config is modified automatically.")
     print("=" * 64)
 
 
