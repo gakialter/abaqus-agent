@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Abaqus MCP Plugin v4.0 - file IPC bridge.
 

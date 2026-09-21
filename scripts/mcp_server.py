@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Abaqus MCP Server v4.0 - bridges MCP protocol to file-based IPC with Abaqus.
@@ -102,7 +102,7 @@ def check_abaqus_connection() -> str:
 
     if s != 'running':
         return (f'Abaqus plugin loaded but not running (status={s}). '
-                f'Run mcp_start() in Abaqus console.')
+                f'Start the blocking loop: run abaqus_start_mcp.py or call mcp_loop() in the Abaqus kernel.')
 
     result = _send_command('ping', timeout=10.0)
     if result.get('success'):
@@ -113,7 +113,7 @@ def check_abaqus_connection() -> str:
     else:
         return (f'Abaqus plugin loaded but not responding to commands.\n'
                 f'Status: {s} — {msg}\nPing result: {result}\n'
-                f'Try running mcp_start() again in Abaqus.')
+                f'Try restarting via abaqus_start_mcp.py or call mcp_loop() in Abaqus.')
 
 
 @mcp.tool()

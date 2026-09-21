@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 One-click installer: wire this machine's Abaqus/CAE to an AI agent via file-IPC MCP.
 
@@ -23,6 +23,7 @@ HERE = Path(__file__).resolve().parent
 BUNDLED_PLUGIN = HERE / "abaqus_mcp_plugin.py"
 BUNDLED_CLIENT = HERE / "client.py"
 BUNDLED_MCP_SERVER = HERE / "mcp_server.py"
+BUNDLED_SKILL_MD = HERE.parent / "SKILL.md"
 LAUNCHER_TEMPLATE = (HERE / "abaqus_start_mcp.py").read_text(encoding="utf-8")
 
 
@@ -105,6 +106,14 @@ def main():
     shutil.copy(BUNDLED_PLUGIN, ws / "abaqus_mcp_plugin.py")
     shutil.copy(BUNDLED_CLIENT, ws / "client.py")
     shutil.copy(BUNDLED_MCP_SERVER, ws / "mcp_server.py")
+
+    # Copy SKILL.md if present in the repo; otherwise note it must be installed
+    # separately by pointing your agent at the repo root.
+    if BUNDLED_SKILL_MD.exists():
+        shutil.copy(BUNDLED_SKILL_MD, ws / "SKILL.md")
+        skill_copied = True
+    else:
+        skill_copied = False
     launcher = LAUNCHER_TEMPLATE.replace("__WORKSPACE__", str(ws))
     (ws / "abaqus_start_mcp.py").write_text(launcher, encoding="utf-8")
 
@@ -148,6 +157,17 @@ def main():
     print(f'3) Drive Abaqus directly:')
     print(f'     "{venv_py}" "{ws}\\client.py"   (then import client; send("execute_script", ...))')
     print()
+    print()
+    if skill_copied:
+        print("5) Skill installed at:")
+        print(f'     {ws}\\SKILL.md')
+        print("     Point your agent skill directory at this workspace to load it.")
+    else:
+        print("5) Skill (SKILL.md) was NOT bundled with this installer.")
+        print("   Install it separately by cloning the repo and pointing your agent")
+        print("   skill root at the repo directory that contains SKILL.md.")
+    print("=" * 64)
+
     print("4) MCP client config (already generated, env embedded):")
     print(f'     {ws}\\mcp_client_config.json')
     print("     - Cursor: merge the mcpServers entry into .cursor/mcp.json")
