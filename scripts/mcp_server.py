@@ -15,7 +15,9 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-MCP_HOME = Path(os.environ.get('ABAQUS_MCP_HOME', Path.home() / '.abaqus-mcp'))
+# Single source of truth: <workspace>/mcp_home, where workspace = this file's dir.
+MCP_HOME = Path(os.environ.get('ABAQUS_MCP_HOME',
+                               str(Path(__file__).resolve().parent / 'mcp_home')))
 COMMANDS_DIR = MCP_HOME / 'commands'
 RESULTS_DIR = MCP_HOME / 'results'
 STATUS_FILE = MCP_HOME / 'status.json'
