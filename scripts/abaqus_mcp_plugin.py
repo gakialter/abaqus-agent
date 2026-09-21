@@ -7,8 +7,9 @@ Supports script execution, model/job/ODB queries, and viewport capture.
 
 Usage:
 1. File -> Run Script... -> choose this file
-2. Run mcp_start() for non-blocking background mode (recommended)
-3. Run mcp_loop() for blocking mode
+2. Run mcp_loop() for blocking mode (recommended on Abaqus/CAE 2026;
+   all kernel calls stay on the main thread, most reliable)
+3. mcp_start() background thread mode is experimental and not recommended
 4. Run mcp_stop() to stop
 """
 
@@ -285,7 +286,9 @@ def submit_job(job_name):
         job.submit(consistencyChecking=False)
         job.waitForCompletion()
         status = str(getattr(job, 'status', 'UNKNOWN'))
-        return {'success': True, 'job': job_name, 'status': status}
+        ok = (status == 'COMPLETED')
+        return {'success': ok, 'job': job_name, 'status': status,
+                'error': None if ok else 'Job ended with status ' + status}
     except Exception as e:
         return {'success': False, 'error': str(e), 'traceback': traceback.format_exc()}
 
@@ -328,17 +331,33 @@ def get_viewport_image(viewport_name=None, width=800, height=600, fmt='PNG'):
         if vp_name not in session.viewports:
             return {'success': False, 'error': 'Viewport not found: ' + str(vp_name)}
 
-        img_file = os.path.join(SCREENSHOTS_DIR, 'viewport_' + str(int(time.time())) + '.' + fmt.lower())
+        # printToFile appends its OWN extension; give it an extensionless basename.
+        img_base = os.path.join(SCREENSHOTS_DIR, 'viewport_' + str(int(time.time())))
         session.printToFile(
-            fileName=img_file,
+            fileName=img_base,
             format=_fmt_map.get(fmt.upper(), PNG),
             canvasObjects=(session.viewports[vp_name],)
         )
-        if os.path.exists(img_file):
-            with open(img_file, 'rb') as f:
+        # Discover the real on-disk file (printToFile may use .png/.svg/.tif).
+        ext_map = {'PNG': '.png', 'SVG': '.svg', 'TIFF': '.tif'}
+        found = None
+        candidate = img_base + ext_map.get(fmt.upper(), '.png')
+        if os.path.exists(candidate):
+            found = candidate
+        if found is None:
+            try:
+                cands = [os.path.join(SCREENSHOTS_DIR, f)
+                         for f in os.listdir(SCREENSHOTS_DIR)
+                         if f.startswith('viewport_')]
+                if cands:
+                    found = max(cands, key=os.path.getmtime)
+            except Exception:
+                pass
+        if found and os.path.exists(found):
+            with open(found, 'rb') as f:
                 data = base64.b64encode(f.read()).decode('ascii')
             try:
-                os.remove(img_file)
+                os.remove(found)
             except Exception:
                 pass
             return {'success': True, 'image_base64': data, 'format': fmt.lower()}
@@ -689,7 +708,7 @@ def mcp_loop(sleep_interval=0.1):
 
     print('MCP: Listening for commands...')
     print('MCP: To stop, run in PowerShell:')
-    print('     echo $null > "$env:USERPROFILE\\.abaqus-mcp\\stop.flag"')
+    print('     New-Item -ItemType File -Force "' + STOP_FILE + '"')
     print('')
 
     write_status('running', 'Polling active (blocking)')
@@ -828,8 +847,8 @@ print('=' * 55)
 print('Home:   ' + MCP_HOME)
 print('Abaqus: ' + str(ABAQUS_AVAILABLE))
 print('')
-print('Start:  mcp_start()     (background, recommended)')
-print('        mcp_loop()      (blocking)')
+print('Start:  mcp_loop()      (blocking, recommended on Abaqus/CAE 2026)')
+print('        mcp_start()     (background, experimental)')
 print('Stop:   mcp_stop()')
 print('Status: mcp_status()')
 print('=' * 55)
