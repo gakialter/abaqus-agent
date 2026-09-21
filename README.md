@@ -70,20 +70,31 @@ abaqus-agent/
 `ping`, `check_abaqus_connection`, `execute_script`, `get_model_info`, `list_jobs`,
 `submit_job`, `get_odb_info`, `get_viewport_image`.
 
-## Status of this fork / adaptation
+## Adaptation & changelog (validated on Abaqus 2026)
 
-Bundles [Cai-aa/abaqus-mcp v4.0](https://github.com/Cai-aa/abaqus-mcp) (MIT) with two
-compatibility fixes for Abaqus 2026 / modern Python:
-- `get_viewport_image` now uses `abaqusConstants.PNG/SVG/TIFF` (2026's `Session` has no `.PNG`).
+Bundles [Cai-aa/abaqus-mcp v4.0](https://github.com/Cai-aa/abaqus-mcp) (MIT) with fixes
+validated end-to-end on Abaqus/CAE 2026 (Python 3.10):
+
+- `get_viewport_image`: extensionless basename (printToFile adds its own extension) +
+  `abaqusConstants.PNG/SVG/TIFF`; the real on-disk file is discovered and returned.
+- `submit_job`: returns `success=true` only when the final status is `COMPLETED`;
+  ABORTED/TERMINATED/ERROR return `success=false` with the final status kept.
+- `mcp_loop()` stop instruction points at the real `<workspace>/mcp_home/stop.flag`.
+- `ABAQUS_MCP_HOME` has a single source of truth: `<workspace>/mcp_home` for the plugin,
+  client and MCP server. The installer writes `mcp_client_config.json` with that env embedded.
+- Recommended mode is blocking `mcp_loop()` (background thread mode is experimental).
 - External server pins `mcp<2` (the bundled code uses FastMCP v1).
+
+Validation: a 100x10x10 mm cantilever ran build -> mesh -> job -> ODB -> contour screenshot;
+job COMPLETED, max displacement 0.403 mm, max von Mises 100.2 MPa.
 
 ## Disclaimer / safety
 
-- `execute_script` runs arbitrary Python in the Abaqus kernel — only use with trusted scripts
+- `execute_script` runs arbitrary Python in the Abaqus kernel - only use with trusted scripts
   and never expose this to the public internet.
 - Does not include Abaqus, a license, or any commercial model data. You need your own legal
   Abaqus install and license.
 
 ## License
 
-MIT for the added installer/wrapper; the bundled bridge plugin is MIT (see upstream repo).
+MIT. Bundles upstream MIT code from Cai-aa/abaqus-mcp; see `LICENSE` and `NOTICE.md`.
