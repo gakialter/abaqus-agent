@@ -17,9 +17,11 @@ import time
 import uuid
 from pathlib import Path
 
+# Single source of truth: <workspace>/mcp_home, where workspace = this file's dir.
+# Override with the ABAQUS_MCP_HOME env var if needed.
 MCP_HOME = Path(os.environ.get(
     "ABAQUS_MCP_HOME",
-    str(Path.home() / "abaqus-agent" / "mcp_home"),
+    str(Path(__file__).resolve().parent / "mcp_home"),
 ))
 COMMANDS_DIR = MCP_HOME / "commands"
 RESULTS_DIR = MCP_HOME / "results"
