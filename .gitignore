@@ -17,7 +17,6 @@ abaqus_acis.log
 # MCP workspace (runtime-generated, not source)
 mcp_home/
 work/
-validation/result_screenshot.png
 
 # OS / editor
 .DS_Store
