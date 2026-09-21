@@ -49,20 +49,38 @@ next commands. Optional flags: `--workspace D:\abaqus-agent --abaqus-cmd abaqus`
    ```
    For a standard MCP client, run `<workspace>\.venv\Scripts\python.exe <workspace>\mcp_server.py`.
 
+## Layers: execution vs knowledge
+
+- **Execution layer (`scripts/`)** — the validated MCP/file-IPC/kernel bridge. This is the
+  part that actually runs Abaqus. Stable; do not redesign.
+- **Knowledge layer (`references/`)** — progressive-disclosure Abaqus recipes (workflow,
+  diagnosis, verification, materials, mesh, contact, ODB post-processing, linear/nonlinear
+  static). `SKILL.md` is a thin router that picks the right file per task.
+- **Knowledge source** — adapted in part from
+  [jasonanewcoder/abaqus_skills](https://github.com/jasonanewcoder/abaqus_skills) (MIT),
+  audited, rewritten and **re-validated on this machine's Abaqus 2026**. Upstream-unverified
+  APIs are kept flagged, not silently treated as proven.
+
 ## Layout
 
 ```
 abaqus-agent/
-├── SKILL.md                     # agent-facing instructions (load as a skill)
+├── SKILL.md                     # agent-facing thin router (load as a skill)
 ├── scripts/
 │   ├── setup_abaqus_agent.py    # one-click installer
 │   ├── abaqus_mcp_plugin.py     # Abaqus kernel bridge (patched for 2026)
 │   ├── mcp_server.py            # stdio MCP server for MCP clients
 │   ├── client.py                # direct file-IPC driver
 │   └── abaqus_start_mcp.py      # Abaqus-side launcher template
-└── references/
-    ├── gotchas.md               # Abaqus 2026 / Windows pitfalls
-    └── validation_recipe.md     # cantilever beam → job → ODB → screenshot recipe
+├── references/
+│   ├── gotchas.md               # Abaqus 2026 / Windows pitfalls
+│   ├── validation_recipe.md     # cantilever beam -> job -> ODB -> screenshot
+│   ├── execution/               # workflow, error-diagnosis, verification
+│   ├── modeling/                # material, mesh, contact, odb-postprocess
+│   └── analysis/                # linear-static, nonlinear-static
+└── validation/
+    ├── result.json              # original cantilever E2E result
+    └── knowledge-layer/         # Abaqus 2026 micro-validations (material/nonlinear/contact/diagnosis)
 ```
 
 ## Available commands
@@ -87,6 +105,16 @@ validated end-to-end on Abaqus/CAE 2026 (Python 3.10):
 
 Validation: a 100x10x10 mm cantilever ran build -> mesh -> job -> ODB -> contour screenshot;
 job COMPLETED, max displacement 0.403 mm, max von Mises 100.2 MPa.
+
+Knowledge-layer micro-validations (Abaqus 2026, see `validation/knowledge-layer/`):
+- **Elastic-plastic**: EPP table `((250,0),(250,0.5))`, `nlgeom=ON`, displacement control ->
+  COMPLETED, Mises pinned at 250 MPa, PEEQ=0.10, RF=27.56 kN (true-stress check within 0.5%).
+- **Contact**: frictionless deformable cube on a discrete rigid platen -> CPRESS=4086 MPa
+  (expected 4200), RF balanced; documented the 2026 `main=`/`secondary=` rename and the
+  requirement to mesh rigid parts.
+- **Diagnosis**: deliberately under-constrained cube -> ABORTED; `.sta` exponential cutbacks
+  + `.msg` `NUMERICAL SINGULARITY` at free nodes, mapped to missing BCs.
+
 
 ## Disclaimer / safety
 

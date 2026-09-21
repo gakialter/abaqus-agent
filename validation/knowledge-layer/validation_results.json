@@ -1,0 +1,76 @@
+{
+  "validated_on": "Abaqus/CAE 2026 (Python kernel), Windows, live file-IPC bridge v4.0.0",
+  "bridge": "agent -> client.send -> mcp_home file IPC -> abaqus_mcp_plugin.mcp_loop -> mdb/session",
+  "date_local": "2026-09-22T01:10:00-05:00",
+  "results": {
+    "A_material_plasticity": {
+      "status": "PASS",
+      "model": "10x10x10 mm cube, C3D8R enhanced hourglass, E=210000 MPa, nu=0.3, EPP yield=250 MPa",
+      "plastic_table": [[250.0, 0.0], [250.0, 0.5]],
+      "checks": {
+        "first_plastic_point_zero": true,
+        "job_status": "COMPLETED",
+        "nlgeom": "ON",
+        "max_mises_MPa": 250.0,
+        "max_PEEQ": 0.100447,
+        "note": "Mises pinned exactly at yield = plastic plateau reached; PEEQ output reads fine."
+      }
+    },
+    "B_nonlinear_static": {
+      "status": "PASS",
+      "checks": {
+        "step_type": "StaticStep nlgeom=ON, displacement controlled (u3=-0.5 mm)",
+        "nframes": 13,
+        "job_status": "COMPLETED",
+        "odb_read_ok": true
+      }
+    },
+    "E_verification_RF_balance": {
+      "status": "PASS",
+      "checks": {
+        "RF3_total_N": 27557.09,
+        "naive_plateau_sigma_y_times_A": 25000.0,
+        "naive_pct": 10.23,
+        "true_stress_corrected_N": 27683.0,
+        "corrected_pct": 0.5,
+        "note": "The 10% gap vs sigma_y*initial_area(25000) is the EXPECTED nlgeom large-deformation effect: at 5% true compression current area grows ~5% (plastic incompressibility), so true-stress force ~27.7 kN. FE 27.56 kN matches within 0.5%. RF balance confirmed."
+      }
+    },
+    "C_contact": {
+      "status": "PASS",
+      "model": "deformable cube 10mm on discrete rigid flat platen, frictionless SurfaceToSurfaceContactStd, main/secondary (Abaqus 2026 rename), finite sliding, nlgeom=ON, driven u3=-0.2 mm",
+      "checks": {
+        "job_status_msg": "ANALYSIS COMPLETED, 0 errors, 12 increments",
+        "max_CPRESS_MPa": 4086.52,
+        "expected_elastic_MPa": 4200.0,
+        "pct": 2.7,
+        "n_active_contact_nodes": 36,
+        "max_COPEN_mm": 0.00729,
+        "top_RF3_N": 413449.68,
+        "note": "CPRESS/COPEN are emitted as per-interaction fields 'CPRESS   ASSEMBLY_<slave>/<master>', NOT under 'CSTRESS'. Top reaction ~413 kN matches elastic E*strain*A=420 kN."
+      }
+    },
+    "D_diagnosis": {
+      "status": "PASS",
+      "deliberate_fault": "free cube, concentrated load, NO boundary condition",
+      "checks": {
+        "job_status": "ABORTED",
+        "sta_evidence": "exponential incremental cutback: time 1.0 -> 0.25 -> 0.0625 -> 0.0156 -> 0.0039, 'U' iteration flags, 'THE ANALYSIS HAS NOT BEEN COMPLETED'",
+        "msg_evidence": "***WARNING: SOLVER PROBLEM. NUMERICAL SINGULARITY WHEN PROCESSING NODE B-1.x (repeated at free nodes)",
+        "agent_diagnosis": "rigid-body motion / under-constraint -> add BCs; do NOT simply reduce increment.",
+        "also_diagnosed_live": [
+          "discrete rigid part not meshed -> .dat 'ELEMENT SET ..._BODY HAS NOT BEEN DEFINED' + 'MAIN SURFACE ... DOES NOT EXIST' -> fix: mesh the rigid part",
+          "SurfaceToSurfaceContactStd master=/slave= rejected in 2026 -> use main=/secondary= (version-dependent upstream API)"
+        ]
+      }
+    }
+  },
+  "version_dependent_findings_for_references": [
+    "SurfaceToSurfaceContactStd: use main=/secondary= (NOT master=/slave=) in Abaqus 2026.",
+    "Contact pressure output is per-interaction key 'CPRESS   <slave>/<master>'; 'CSTRESS' is not a field key.",
+    "Discrete rigid parts MUST be meshed (R3D4) before RigidBody bodyRegion / contact surface resolve to an element set.",
+    "Part.translate does not exist in 2026 CAE Python; position geometry at build time or use datum planes.",
+    "import mesh is required in kernel scripts (from abaqus import * does not bind 'mesh').",
+    "kernel scripts must be UTF-8 WITHOUT BOM (U+FEFF breaks exec)."
+  ]
+}

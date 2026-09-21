@@ -18,3 +18,23 @@ License. See `LICENSE`.
 
 This repository does NOT include Abaqus, any Abaqus license, or commercial model data.
 You must supply your own legally licensed Abaqus installation.
+
+---
+
+## Knowledge / reference layer
+
+The `references/` documentation and the diagnosis/verification methodology were adapted in
+part from:
+
+  https://github.com/jasonanewcoder/abaqus_skills
+  MIT License, Copyright (c) 2025 Abaqus Skills Library Contributors
+
+We did not vendor the upstream tree wholesale. We audited its main branch, selectively
+rewrote the parts relevant to general / nonlinear-static / contact / error-diagnosis /
+verification / ODB post-processing, and **re-validated the API examples on this machine's
+Abaqus/CAE 2026** (see `validation/knowledge-layer/`). Items upstream itself marks as
+unverified or version-dependent are kept flagged as such rather than claimed proven.
+
+Notably, the upstream "use Q235 / default geometry / default load when parameters are
+missing" convention is intentionally NOT adopted here: in a course/engineering task the
+problem statement is the only source of truth.
