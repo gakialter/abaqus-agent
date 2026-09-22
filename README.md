@@ -18,6 +18,18 @@ Abaqus/CAE kernel plugin  (mcp_loop, blocking)
 Part → Material → Section → Assembly → Step → BC → Load → Mesh → Job → ODB → screenshot
 ```
 
+## For students / 豆包 Work 一键部署
+
+完全没接触过 Agent / MCP / Git 的同学，只用这三个文件（双击即可）：
+
+| 时机 | 文件 |
+|------|------|
+| 第一次 / 修复 | [`install.bat`](install.bat) |
+| 一键体检 | [`doctor.bat`](doctor.bat) |
+| 每天启动 | [`start_abaqus_agent.bat`](start_abaqus_agent.bat) |
+
+完整说明：[`bootstrap_for_doubao_work.md`](bootstrap_for_doubao_work.md) ｜ 3 分钟速记：[`QUICKSTART_FOR_STUDENTS.md`](QUICKSTART_FOR_STUDENTS.md)
+
 ## Install (one command)
 
 Clone this repo, then run the installer on the machine that has Abaqus:

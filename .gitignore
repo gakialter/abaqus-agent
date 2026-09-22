@@ -18,6 +18,13 @@ abaqus_acis.log
 mcp_home/
 work/
 
+# Bootstrap / install-generated local artifacts (never commit)
+mcp_client_config.json
+.abaqus-agent.local
+doubao_skill_install.txt
+abaqus-agent.bak-*/
+*.bak-*
+
 # OS / editor
 .DS_Store
 Thumbs.db

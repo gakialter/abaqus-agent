@@ -3,14 +3,17 @@
 Abaqus-side launcher. Runs INSIDE Abaqus/CAE kernel via:
     abaqus cae script="<this file>"
 
-setup_abaqus_agent.py fills __WORKSPACE__ at install time. It imports the MCP
+The workspace is derived from ABAQUS_MCP_HOME (set by start_abaqus_agent.bat),
+NOT from ``__file__`` (Abaqus does not define ``__file__`` for ``cae script=``).
+Falls back to the current directory when launched manually. It imports the MCP
 plugin, sets the isolated work directory, and starts a blocking poll loop
 (main-thread = most reliable). No Abaqus install-dir or License files touched.
 """
 import os
 import sys
 
-WORKSPACE = r"__WORKSPACE__"
+_MCP_HOME = os.environ.get("ABAQUS_MCP_HOME", "").strip()
+WORKSPACE = os.path.dirname(_MCP_HOME) if _MCP_HOME else os.getcwd()
 WORKDIR = os.path.join(WORKSPACE, "work")
 
 os.environ.setdefault("ABAQUS_MCP_HOME", os.path.join(WORKSPACE, "mcp_home"))
