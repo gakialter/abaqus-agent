@@ -200,6 +200,16 @@ def write_fallback_install_text():
     return str(txt)
 
 
+
+def choose_skill_runtime(runtimes):
+    if len(runtimes) <= 1:
+        return list(runtimes)
+    already = [r for r in runtimes if (Path(r) / 'abaqus-agent').exists()]
+    if len(already) == 1:
+        return already
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -293,14 +303,15 @@ def main():
         cfg_path = write_config(venv_py, abq_cmd)
     ok("Config written")
 
-    # 6) Skill
-    runtimes = skill_runtime_candidates()
+    # 6) Skill - do NOT blanket-sync to every guessed runtime.
+    runtimes = choose_skill_runtime(skill_runtime_candidates())
+    ambiguous = len(skill_runtime_candidates()) > 1 and len(runtimes) == 0
     if args.dry_run:
         if runtimes:
             for r in runtimes:
                 info("     [dry-run] would sync skill -> %s\\abaqus-agent" % r)
         else:
-            info("     [dry-run] no skill runtime detected; would write doubao_skill_install.txt")
+            info("     [dry-run] no single trusted runtime; would write doubao_skill_install.txt")
     else:
         if runtimes:
             for r in runtimes:
@@ -308,9 +319,11 @@ def main():
                 ok("Skill synced -> %s" % tgt)
         else:
             fb = write_fallback_install_text()
-            warn("No skill runtime detected automatically.")
+            warn("No single trusted skill runtime detected automatically.")
             warn("Wrote fallback: %s" % fb)
             warn("Use the self-install prompt in bootstrap_for_doubao_work.md inside Doubao Work.")
+            if ambiguous:
+                warn("Multiple candidate runtimes found; not overwriting any. Let Doubao Work pick its own runtime.")
 
     # Summary
     print()

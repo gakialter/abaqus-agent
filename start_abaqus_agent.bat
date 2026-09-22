@@ -25,7 +25,8 @@ if "%ABAQUS_CMD%"=="" set "ABAQUS_CMD=abaqus"
 set "ABAQUS_MCP_HOME=%MCP_HOME%"
 
 REM --- is the bridge already running? (avoid starting a 2nd Abaqus/license use) ---
-"%VENV_PY%" -c "import json,os,time,subprocess; p=r'%STATUS%'; s=json.load(open(p)) if os.path.exists(p) else {}; pid=s.get('pid'); alive=bool(pid) and str(pid) in subprocess.run(['tasklist','/FI','PID eq '+str(pid)],capture_output=True,text=True).stdout; running=s.get('status')=='running' and (alive or time.time()-float(s.get('timestamp',0))<15); print('RUNNING' if running else 'STOPPED')" > "%TEMP%\abaqus_bridge_state.txt"
+REM --- RUNNING only when status==running AND a real ping succeeds (not just a stale status) ---
+"%VENV_PY%" "%REPO%scripts\bridge_state.py" > "%TEMP%\abaqus_bridge_state.txt"
 set "BSTATE="
 for /f "usebackq delims=" %%A in ("%TEMP%\abaqus_bridge_state.txt") do set "BSTATE=%%A"
 
