@@ -66,9 +66,11 @@ the hard parameter rule). Then read the slice for the task:
 
 | Task | Read |
 |------|------|
-| Run the end-to-end loop | [execution/workflow.md](references/execution/workflow.md) |
+| Run the end-to-end loop (8 phases + gates) | [execution/workflow.md](references/execution/workflow.md) |
+| Why past failures happened / closed-loop rules | [execution/lessons-learned.md](references/execution/lessons-learned.md) |
+| Static regression scenarios (no rerun needed) | [execution/regression-checklist.md](references/execution/regression-checklist.md) |
 | Job ABORTED / won't converge | [execution/error-diagnosis.md](references/execution/error-diagnosis.md) |
-| Prove the result is right | [execution/verification.md](references/execution/verification.md) |
+| Prove the result is right (gate + no back-fitting) | [execution/verification.md](references/execution/verification.md) |
 | Material / plasticity / section | [modeling/material.md](references/modeling/material.md) |
 | Mesh & elements | [modeling/mesh.md](references/modeling/mesh.md) |
 | Contact / rigid body / coupling | [modeling/contact.md](references/modeling/contact.md) |
@@ -79,6 +81,16 @@ the hard parameter rule). Then read the slice for the task:
 
 Proven recipes live in `validation/knowledge-layer/` (Abaqus 2026 micro-tests + results).
 
+## The completion bar (read before declaring done)
+
+A job `COMPLETED` is only **Gate C (solver reached the end)**. You may write
+"analysis completed and validated" only after all eight phases pass — see
+[execution/workflow.md](references/execution/workflow.md):
+
+`A Problem fidelity → B Model validity → C Solver completion → D Result extraction → E Physics verification → F Reporting consistency`
+plus the pre-run **output-request gate** and the **requirement-compliance gate**.
+If only C is true, write "solver completed" and name the gates that did not pass.
+
 ## Hard rules for an engineering / course task
 
 1. **The problem statement is the only fact source.** If it gives a PDF/DOCX/image/drawing
@@ -87,12 +99,36 @@ Proven recipes live in `validation/knowledge-layer/` (Abaqus 2026 micro-tests + 
    another approach "seems more reasonable". Defaults are allowed only when the user
    explicitly asks for a demo/example or permits them.
    - Never repeat the mistake of rebuilding a 4-node truss as a 6-node, 9-bar model.
-2. **COMPLETED ≠ correct.** Run the smallest sufficient verification (RF balance and/or an
-   analytical check) before reporting numbers.
-3. **Read logs before shrinking increments.** On failure go to
-   execution/error-diagnosis.md.
+   - A parameter that "looks wrong" (e.g. a small E) is **not** permission to edit it:
+     mark the doubt, use the stated value, offer an alternate rerun.
+2. **COMPLETED ≠ correct.** Run the smallest sufficient verification
+   ([verification.md](references/execution/verification.md)) before reporting numbers — and
+   never back-fit a theory to the FE number, never quote a local max as the whole-field
+   state, and never mix jobs/frames/regions.
+3. **Request required outputs before solving.** If the task wants CPRESS / a punch RP
+   reaction / a time history, confirm the ODB output request exists **before** `submit_job`
+   (workflow GATE 3a). An unrequested result cannot be inferred afterward.
 4. **Do not auto-"fix" convergence by changing the problem** (material strength, friction,
    geometry, load, BC values) unless the original choice was itself a modeling error.
+5. **Report like an auditor.** Every number/unit/sign/radius-vs-diameter/engineering-vs-true
+   strain in the report must be re-checked against the model variables; a correct computation
+   does not certify its own prose.
+
+## Explicitly forbidden behaviors
+
+- Inventing a missing parameter/geometry/load when the statement does not give it.
+- "Correcting" a suspicious input without telling the user.
+- Substituting a familiar standard model/example for the stated problem.
+- Trusting `COMPLETED` alone; declaring "validated" without the gates.
+- Hunting for a formula that lands near the FE output (back-fitting).
+- Treating `max PEEQ / max S / max CPRESS` as the whole-model representative value.
+- Treating a local singularity/constraint peak as bulk material response.
+- Reporting an "average" without stating its averaging definition.
+- Using summed RF as if it were CPRESS, or press force as contact pressure.
+- Using an equivalent BC to fake a contact/RP result the task explicitly requires.
+- Claiming strength/yield satisfaction without a yield strength in the model.
+- Deleting a zero-force bar/element from a single load case.
+- Writing report formulas without re-checking signs, units, and radius/diameter names.
 
 ## Safety / scope
 

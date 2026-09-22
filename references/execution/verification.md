@@ -10,6 +10,38 @@ A job that ends `COMPLETED` only means the solver reached the end. It can still 
 because of wrong BCs, wrong units, coarse mesh, or a contact that never engaged. Before
 reporting numbers, prove at least one physical check.
 
+## Verification Gate — run BEFORE writing any "% agreement"
+
+A numerical match is meaningless if the two sides are not actually comparable. Confirm
+all of:
+
+1. **same Job** (not a re-run with changed material/BC),
+2. **same frame** (last frame, or the frame the theory applies to),
+3. **same physical quantity**,
+4. **same spatial region** (bulk, not a constraint corner; support set, not whole body),
+5. **same units**,
+6. **same boundary-condition assumptions**,
+7. **the analytical model is applicable to this FE model.**
+
+If (7) fails (e.g. FE has barreling / end triaxiality / friction the formula ignores),
+the comparison is only a **sanity check**, never a "high-precision analytical validation".
+
+**Never back-fit a theory to the FE number.** A formula built after the run so that it
+lands within 1% is not validation. If you cannot derive the expected value *before* the
+run, say it is a sanity check.
+
+## Local extremum vs representative value
+
+Do not quote `max S / max PEEQ / max CPRESS / max U` as the state of the whole model.
+For each field record `max`, `min`, `mean`, and the **location of the maximum**; judge
+whether the max sits at a constraint, contact edge, or singularity (e.g. PEEQ peaked at
+an encastred corner while the body mean was the representative strain). Any "average"
+must state its averaging definition (nodal arithmetic mean, area-weighted mean, or path
+average) — an undefined "average" is not a result.
+
+Press force (summed RF on a driven RP/face) is **not** contact pressure (CPRESS field).
+Report them as separate quantities; CPRESS-averaged is a separate derived number.
+
 ## Minimum sufficient verification (pick by task type)
 
 | Task type | Minimum check |
@@ -36,7 +68,9 @@ for v in rf.getSubset(region=odb.rootAssembly.nodeSets['FIXED']).values:
 print('sum RF =', tot)   # compare with applied load
 ```
 For a displacement-driven compression, the driven face's RF3 equals the contact/support
-reaction (we measured 27.56 kN EPP and 413 kN elastic — both matched hand calc).
+reaction (we measured 27.56 kN EPP and 413 kN elastic). The elastic 413 kN matched
+`E*strain*A = 420 kN` tightly; the EPP 27.56 kN is only order-of-magnitude because the
+specimen barreled (see the plastic-plateau caveat below) — its tight check is PEEQ, not force.
 
 ## 2. Analytical benchmarks (use when the geometry admits it)
 
@@ -53,9 +87,19 @@ Expect 1–5% agreement with C3D8R (better with C3D8I/C3D20R).
 F_plateau = sy * A_current
 ```
 With `nlgeom=ON` and large strain, use the **current** (deformed) area, not the initial
-area. At 5% true compression the area grows ~5% (plastic incompressibility); our FE force
-27.56 kN matched the true-stress estimate 27.7 kN to 0.5%. A 5–10% gap vs `sy*A_initial`
-is expected, not an error — explain it rather than "fix" it.
+area. **Caveat learned the hard way:** if the specimen ends are encastred / friction-
+locked, it barrels and the ends are triaxially stressed, so `sy*A` is only an
+**order-of-magnitude** check — NOT a tight benchmark. The tight check is then the
+**field-mean PEEQ vs the theoretical plastic strain**, not the force. In our 5% EPP
+cube, `mean PEEQ = 0.0506` matched theory `ln(9.5/10) - sy/E = 0.0501` to ~1.1%, while
+`max PEEQ = 0.100` at the constrained corner must not be quoted as the global strain,
+and `sy*A` carried a ~10% gap from end triaxiality (explain it, do not "fix" it with a
+back-fit — never manufacture a "theoretical" force that lands near the measured RF).
+
+**Interference / press-fit compatibility.** Do not judge "it fits" from one radial number
+alone. The closure is `ring inward radial displacement + bore outward radial displacement
+≈ radial interference`, both measured at the mating interface in the same frame; report
+both sides and their sum.
 
 **Thick-walled cylinder (Lame)**: hoop at inner wall = p*(a^2+b^2)/(b^2-a^2).
 

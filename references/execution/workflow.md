@@ -25,24 +25,56 @@ Bridge commands you actually have:
 - Jobs write their `.odb/.sta/.msg/.dat` to the kernel CWD. **Start every build script
   with `os.chdir(<your scratch dir>)`** so outputs land where you can read them back.
 
-## The execution loop (mandatory)
+## The execution loop (mandatory) — 8 phases, gated
+
+Each phase ends at a gate. A failed gate stops the loop; do not pass through it by
+"the job ran fine". Gate names map to the rules in `lessons-learned.md`.
 
 ```
-1. PARSE         read the problem (PDF/DOCX/image/参数表). Identify geometry, material,
-                 boundary conditions, loads, analysis type. The problem statement is the
-                 ONLY source of truth — see "Hard rule: parameters" below.
-2. CONFIRM       if a key input is missing/illegible, STOP and ask. Never guess a number.
-3. ROUTE         pick the references (see SKILL.md router) and read them.
-4. BUILD         send one model-building script via execute_script. Delete any prior model
-                 of the same name first. Keep every line unit-labelled (N-mm-MPa).
-5. MESH/JOB      create the mdb.Job; call submit_job.
-6. DIAGNOSE      if ABORTED: read .sta/.msg/.dat/.log -> error-diagnosis.md. Apply the
-                 MINIMAL fix. Re-run (max ~3 attempts, then report honestly).
-7. POSTPROCESS   read the ODB in-kernel (odb-postprocess.md), compute Mises from S,
-                 pull RF / PEEQ / CPRESS as needed.
-8. VERIFY        run the smallest sufficient check (verification.md): RF balance and/or
-                 analytical comparison. COMPLETED != correct.
-9. REPORT        model summary, key results, verification numbers, warnings, files.
+PHASE 1 PROBLEM FIDELITY
+   read the original statement (PDF/DOCX/image/参数表). List facts and unknowns.
+   GATE 1 Problem Fidelity (lessons-learned Case 1): nodes/parts, topology, dims,
+     material, load location, load direction, supports, contacts, objective all
+     transcribed from the statement. Missing/illegible -> STOP and ask. No guessing.
+PHASE 2 MODEL PLAN
+   dimensionality (3D vs axisymmetry when truly axisymmetric), element, material,
+   BC, load, contact, expected outputs.
+   GATE 2 Requirement Compliance (Case 4): every observable the statement asks for
+     (CPRESS, punch RP RF, specific component, opening ...) maps to a real entity in
+     this plan. No "equivalent BC" standing in for a requested contact/RP result.
+PHASE 3 PREFLIGHT
+   units (N-mm-MPa), geometry, topology, output requests, job path, scratch chdir.
+   GATE 3a Pre-run Output (Case 6): each required observable has an ODB output path
+     (S/U/RF/PEEQ/CPRESS/COPEN/HistoryOutput) in the FieldOutput/HistoryOutput request.
+     A required-but-unrequested quantity -> add it now, do not start the run.
+   GATE 3b Suspicious input (Case: keep E=21000 as written): a parameter that "looks
+     wrong" vs common knowledge is NOT permission to edit it. Mark the doubt, use the
+     stated value, offer an alternate rerun.
+PHASE 4 RUN
+   build via one execute_script (delete same-named model first); submit_job with a
+   generous timeout; if ABORTED read .sta/.msg/.dat/.log -> error-diagnosis.md, apply
+   the MINIMAL fix, re-run (max ~3 attempts, then report honestly).
+   GATE 4 Solver completion: status == COMPLETED. This alone is NOT success.
+PHASE 5 RESULT EXTRACTION
+   read ODB in-kernel (odb-postprocess.md), compute Mises from S, pull field + history.
+   GATE 5 Result Interpretation (Cases 2/3/7): for every reported extrema record
+     location, region, proximity to a constraint/contact edge, singularity plausibility,
+     and a representative mean/path value with its averaging definition.
+PHASE 6 VERIFICATION
+   smallest sufficient check (verification.md): RF balance, analytical/sanity check,
+     interference compatibility, trends, mesh sensitivity when needed.
+   GATE 6 Verification (Cases 2/7): same Job/frame/quantity/region/units/BC/assumptions;
+     no back-fitting; benchmark applicable to this FE model; press force kept distinct
+     from CPRESS.
+PHASE 7 REPORTING
+   model summary, key results, verification numbers, warnings, files.
+   GATE 7 Report Consistency (Case 5): numbers/units/signs/radius-vs-diameter/
+     engineering-vs-true strain/direction checked against model variables and formulas.
+PHASE 8 COMPLETION GATE
+   only when GATES 1..7 all pass may you write
+     "analysis completed and validated".
+   If the solver merely returned COMPLETED, write "solver completed" and list the
+   gates that did NOT pass.
 ```
 
 ## Hard rule: parameters come from the problem, never from defaults
@@ -86,3 +118,25 @@ This repo does **not** adopt the upstream "default Q235 / default 100 mm block /
 - `import mesh` is required; `from abaqus import *` does not bind `mesh`.
 - Model/job name collisions error out; delete before recreating.
 - `printToFile(fileName=...)` wants an extensionless base name + `from abaqusConstants import PNG`.
+
+## Required-observable → ODB key quick map (GATE 3a)
+
+| Statement asks for | Must request in the job |
+|--------------------|--------------------------|
+| stress / Mises | `S` (Mises is computed post, never requested) |
+| displacement / deformation | `U` |
+| reaction / press force | `RF` (on the set/RP you drive) |
+| plastic strain / yield | `PEEQ` (and `PE`) |
+| contact pressure | `CPRESS` (per-interaction key!) |
+| contact opening / slip | `COPEN`, `CSHEAR` |
+| a quantity vs time (force–time, CPRESS–time) | `HistoryOutput` for that interaction/RP |
+
+If the task lists an observable above and the `FieldOutputRequest`/`HistoryOutput` does
+not include it, **stop and add it before `submit_job`** — an unrequested result cannot
+be reconstructed later.
+
+## Where the failure stories live
+
+Closed-loop `failure/success → root cause → rule` entries are in
+[lessons-learned.md](lessons-learned.md); read it when a gate fires. Static regression
+scenarios are in [regression-checklist.md](regression-checklist.md).
