@@ -68,7 +68,19 @@ class WindowsBatBoundary(unittest.TestCase):
                            "D6_ARG_LOG": str(log),
                            "D6_STATUS_PATH": str(repo / "mcp_home" / "status.json"),
                            "ABAQUS_CMD": str(fake_abq)}
-                    result = self.run_bat(repo / "start_abaqus_agent.bat", env)
-                    self.assertTrue(log.exists(), result.stdout[-2000:])
+                    (repo / ".abaqus-agent.json").write_text(
+                        json.dumps({"schema_version": 1, "ABAQUS_CMD": str(fake_abq)}), encoding="utf-8")
+                    proc = subprocess.Popen(["cmd.exe", "/d", "/c", "call", str(repo / "start_abaqus_agent.bat")],
+                                            cwd=repo, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                            creationflags=subprocess.CREATE_NO_WINDOW)
+                    try:
+                        import time
+                        deadline = time.monotonic() + 10
+                        while not log.exists() and time.monotonic() < deadline:
+                            time.sleep(.05)
+                        self.assertTrue(log.exists(), "launcher never called fake Abaqus; process=" + str(proc.poll()))
+                    finally:
+                        proc.kill()
+                        proc.communicate(timeout=5)
                     self.assertEqual(json.loads(log.read_text(encoding="utf-8")),
                                      ["cae", "script=" + str(repo / "abaqus_start_mcp.py")])

@@ -32,6 +32,7 @@ def main():
     env = os.environ.copy()
     env['ABAQUS_MCP_HOME'] = str(REPO / 'mcp_home')
     script = str(REPO / 'abaqus_start_mcp.py')
+    (REPO / 'work').mkdir(exist_ok=True)
     try:
         subprocess.Popen([command, 'cae', 'script=' + script], cwd=str(REPO / 'work'), env=env,
                          creationflags=getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))

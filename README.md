@@ -22,7 +22,7 @@ The canonical config is `<repo>/.abaqus-agent.json` with only `schema_version: 1
 
 Commands are atomically published in `commands/`, atomically claimed into `claims/`, and results are atomically published in `results/`. One OS locked consumer owns an IPC home. A queued command can be cancelled before claim; a timeout after claim has unknown outcome and may leave a late result. Side-effecting commands are never retried automatically. There is no cross-publisher FIFO or exactly-once guarantee after a crash.
 
-`submit_job` reporting Abaqus status `COMPLETED` proves solver completion only. Task completion requires the eight gates in [workflow](references/execution/workflow.md). RF is a force and CPRESS is a contact pressure; select the exact contact interaction/key and region. The historical elastic-plastic micro-test had local maximum PEEQ ~0.10; ~0.05064 was an unweighted arithmetic mean of field values, not a proven volume average. A reported RF ~27557 N has no established 0.5% analytical agreement. Historical 27683 N was a back-fit anti-example. See [errata](validation/knowledge-layer/ERRATA.md).
+`submit_job` reporting Abaqus status `COMPLETED` proves solver completion only. Task completion requires the eight gates in [workflow](references/execution/workflow.md). RF is a force and CPRESS is a contact pressure; select the exact contact interaction/key and region. The historical elastic-plastic micro-test had local maximum PEEQ ~0.10; ~0.05064 was an unweighted arithmetic mean of field values, not a proven volume average. No analytical agreement was established for the historical RF near 27557 N. Historical 27683 N was a back-fit anti-example. See [errata](validation/knowledge-layer/ERRATA.md).
 
 ## References and license
 
