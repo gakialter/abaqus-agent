@@ -9,6 +9,8 @@ Also exposes the Abaqus connection status as an MCP resource.
 
 import json
 import os
+import re
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -20,8 +22,10 @@ MCP_HOME = Path(os.environ.get('ABAQUS_MCP_HOME',
                                str(Path(__file__).resolve().parent / 'mcp_home')))
 COMMANDS_DIR = MCP_HOME / 'commands'
 RESULTS_DIR = MCP_HOME / 'results'
+CLAIMS_DIR = MCP_HOME / 'claims'
 STATUS_FILE = MCP_HOME / 'status.json'
 TIMEOUT = 30.0
+_COMMAND_ID = re.compile(r'[0-9a-f]{32}\Z')
 
 mcp = FastMCP("abaqus-mcp-server")
 
@@ -30,19 +34,40 @@ mcp = FastMCP("abaqus-mcp-server")
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _valid_command_id(value):
+    return isinstance(value, str) and _COMMAND_ID.fullmatch(value) is not None
+
+
+def _publish_command(path, command):
+    """Publish a complete command only after its temporary file is closed."""
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                         prefix='.tmp-command-', delete=False) as f:
+            temp_path = Path(f.name)
+            json.dump(command, f)
+            f.flush()
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
 def _send_command(cmd_type: str, timeout: float = TIMEOUT, **kwargs) -> dict:
     """Write a command file and wait for the result file."""
     COMMANDS_DIR.mkdir(parents=True, exist_ok=True)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    CLAIMS_DIR.mkdir(parents=True, exist_ok=True)
 
-    cmd_id = uuid.uuid4().hex[:8]
-    command = {'id': cmd_id, 'type': cmd_type, 'timestamp': time.time(), **kwargs}
+    cmd_id = uuid.uuid4().hex
+    if not _valid_command_id(cmd_id):
+        raise ValueError('Invalid command ID')
+    command = {'type': cmd_type, 'timestamp': time.time(), **kwargs, 'id': cmd_id}
 
     cmd_path = COMMANDS_DIR / f'cmd_{cmd_id}.json'
     result_path = RESULTS_DIR / f'{cmd_id}.json'
 
-    with open(cmd_path, 'w', encoding='utf-8') as f:
-        json.dump(command, f)
+    _publish_command(cmd_path, command)
 
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -56,11 +81,16 @@ def _send_command(cmd_type: str, timeout: float = TIMEOUT, **kwargs) -> dict:
                 pass
         time.sleep(0.05)
 
+    cancelled = COMMANDS_DIR / ('.cancelled-' + cmd_id)
     try:
-        cmd_path.unlink(missing_ok=True)
-    except Exception:
-        pass
-    return {'success': False, 'error': f'Timeout: no response from Abaqus in {timeout}s'}
+        os.replace(cmd_path, cancelled)
+    except OSError:
+        state = 'UNKNOWN_MAY_CONTINUE'
+    else:
+        cancelled.unlink(missing_ok=True)
+        state = 'CANCELLED_BEFORE_CLAIM'
+    return {'success': False, 'error': f'Timeout: no response from Abaqus in {timeout}s',
+            'execution_state': state, 'command_id': cmd_id}
 
 
 def _read_status() -> dict:
@@ -212,8 +242,8 @@ def get_viewport_image(viewport_name: str = "", image_format: str = "PNG") -> st
         data = result.get('data', {})
         if isinstance(data, dict) and data.get('success'):
             b64 = data.get('image_base64', '')
-            fmt = data.get('format', 'png')
-            return f'data:image/{fmt};base64,{b64}'
+            mime = data.get('mime_type', 'image/png')
+            return f'data:{mime};base64,{b64}'
         return json.dumps(data, indent=2)
     else:
         return f'Error: {result.get("error", "Unknown error")}'

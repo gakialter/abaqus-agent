@@ -13,6 +13,8 @@ Usage:
 """
 import json
 import os
+import re
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -25,19 +27,42 @@ MCP_HOME = Path(os.environ.get(
 ))
 COMMANDS_DIR = MCP_HOME / "commands"
 RESULTS_DIR = MCP_HOME / "results"
+CLAIMS_DIR = MCP_HOME / "claims"
 STATUS_FILE = MCP_HOME / "status.json"
+_COMMAND_ID = re.compile(r"[0-9a-f]{32}\Z")
+
+
+def _valid_command_id(value):
+    return isinstance(value, str) and _COMMAND_ID.fullmatch(value) is not None
+
+
+def _publish_command(path, command):
+    """Publish a complete command only after its temporary file is closed."""
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=".tmp-command-", delete=False) as f:
+            temp_path = Path(f.name)
+            json.dump(command, f)
+            f.flush()
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 def send(cmd_type, timeout=30.0, **kwargs):
     """Write one command and block until its result file appears."""
     COMMANDS_DIR.mkdir(parents=True, exist_ok=True)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    cmd_id = uuid.uuid4().hex[:8]
-    command = {"id": cmd_id, "type": cmd_type, "timestamp": time.time(), **kwargs}
+    CLAIMS_DIR.mkdir(parents=True, exist_ok=True)
+    cmd_id = uuid.uuid4().hex
+    if not _valid_command_id(cmd_id):
+        raise ValueError("Invalid command ID")
+    command = {"type": cmd_type, "timestamp": time.time(), **kwargs, "id": cmd_id}
     cmd_path = COMMANDS_DIR / f"cmd_{cmd_id}.json"
     result_path = RESULTS_DIR / f"{cmd_id}.json"
-    with open(cmd_path, "w", encoding="utf-8") as f:
-        json.dump(command, f)
+    _publish_command(cmd_path, command)
     deadline = time.time() + timeout
     while time.time() < deadline:
         if result_path.exists():
@@ -49,8 +74,18 @@ def send(cmd_type, timeout=30.0, **kwargs):
             except Exception:
                 pass
         time.sleep(0.05)
-    cmd_path.unlink(missing_ok=True)
-    return {"success": False, "error": f"Timeout after {timeout}s (cmd={cmd_type})"}
+    # A rename to a private cancellation name proves that no worker claimed it.
+    # If the source vanished, execution may already be underway or complete.
+    cancelled = COMMANDS_DIR / (".cancelled-" + cmd_id)
+    try:
+        os.replace(cmd_path, cancelled)
+    except OSError:
+        state = "UNKNOWN_MAY_CONTINUE"
+    else:
+        cancelled.unlink(missing_ok=True)
+        state = "CANCELLED_BEFORE_CLAIM"
+    return {"success": False, "error": f"Timeout after {timeout}s (cmd={cmd_type})",
+            "execution_state": state, "command_id": cmd_id}
 
 
 def status():

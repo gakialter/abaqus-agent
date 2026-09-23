@@ -21,6 +21,7 @@ REQUIRED_FILES = (
     "abaqus_start_mcp.py", "install.bat", "doctor.bat", "start_abaqus_agent.bat",
     "scripts/bootstrap_windows.py", "scripts/doctor.py", "scripts/bridge_state.py",
     "scripts/local_config.py", "scripts/runtime_detection.py",
+    "scripts/start_windows.py",
 )
 REQUIRED_DIRS = ("references",)
 

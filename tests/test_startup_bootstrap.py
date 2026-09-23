@@ -18,56 +18,46 @@ class Readiness(unittest.TestCase):
         self.state = load("d6_bridge_state_" + self.home.name.replace("-", "_"), "scripts/bridge_state.py")
         self.state.MCP_HOME = self.home
         self.state.STATUS_FILE = self.home / "status.json"
+        self.sid = "a" * 32
+        (self.home / "owner.json").write_text(json.dumps({"session_id": self.sid}), encoding="utf-8")
 
-    def probe(self, status=None, ping_result=None, pid_alive=False):
+    def probe(self, status=None, pong=None, locked=True):
         if status is not None:
             self.state.STATUS_FILE.write_text(status if isinstance(status, str) else json.dumps(status), encoding="utf-8")
-        ping_result = ping_result or {"success": False, "data": {"session_id": "X"}}
-        with mock.patch.object(self.state, "_pid_alive", return_value=pid_alive), \
-             mock.patch.dict("sys.modules", {"client": mock.Mock(send=mock.Mock(return_value=ping_result))}), \
-             mock.patch("builtins.print") as printed:
-            self.state.main()
-        return printed.call_args.args[0]
+        pong = pong or {"success": False}
+        with mock.patch.object(self.state, "_locked", return_value=locked), \
+             mock.patch.dict("sys.modules", {"client": mock.Mock(send=mock.Mock(return_value=pong))}):
+            return self.state.state()
 
     def test_L5_no_malformed_stale_wrong_status(self):
-        self.assertEqual(self.probe(), "STOPPED")
-        self.assertEqual(self.probe("{"), "STOPPED")
-        pong = {"success": True, "data": {"session_id": "X"}}
-        self.assertEqual(self.probe({"status": "running", "timestamp": time.time()-100, "pid": 999, "session_id": "X"}, pong), "STOPPED")
-        self.assertEqual(self.probe({"status": "stopped", "timestamp": time.time(), "pid": 999, "session_id": "X"}, pong), "STOPPED")
-        self.assertEqual(self.probe({"status": "running", "timestamp": time.time(), "pid": 999, "session_id": "X"}), "STOPPED")
+        self.assertEqual(self.probe(locked=False), "STOPPED")
+        self.assertEqual(self.probe("{"), "BUSY_UNRESPONSIVE")
+        pong = {"success": True, "data": {"session_id": self.sid}}
+        self.assertEqual(self.probe({"status": "running", "timestamp": time.time()-100, "session_id": self.sid}, pong), "BUSY_UNRESPONSIVE")
+        self.assertEqual(self.probe({"status": "stopped", "timestamp": time.time(), "session_id": self.sid}, pong), "BUSY_UNRESPONSIVE")
+        self.assertEqual(self.probe({"status": "running", "timestamp": time.time(), "session_id": self.sid}), "BUSY_UNRESPONSIVE")
 
     def test_L5_status_X_ping_X_is_ready(self):
-        status = {"status": "running", "timestamp": time.time(), "pid": 111, "session_id": "X"}
-        pong = {"success": True, "data": {"session_id": "X"}}
-        self.assertEqual(self.probe(status, pong, pid_alive=True), "RUNNING")
+        status = {"status": "running", "timestamp": time.time(), "session_id": self.sid}
+        pong = {"success": True, "data": {"session_id": self.sid}}
+        self.assertEqual(self.probe(status, pong), "BRIDGE_READY")
 
-    @unittest.expectedFailure
     def test_L5_legacy_fresh_status_is_not_ready(self):
-        status = {"status": "running", "timestamp": time.time(), "pid": 111}
-        pong = {"success": True, "data": {"session_id": "X"}}
-        self.assertEqual(self.probe(status, pong, pid_alive=True), "STOPPED")
+        self.assertEqual(self.probe({"status": "running", "timestamp": time.time()}), "BUSY_UNRESPONSIVE")
 
-    @unittest.expectedFailure
     def test_L5_future_timestamp_is_not_fresh(self):
-        status = {"status": "running", "timestamp": time.time()+10000, "pid": 999, "session_id": "X"}
-        self.assertEqual(self.probe(status, {"success": True, "data": {"session_id": "X"}}, pid_alive=True), "STOPPED")
+        status = {"status": "running", "timestamp": time.time()+10000, "session_id": self.sid}
+        self.assertEqual(self.probe(status, {"success": True, "data": {"session_id": self.sid}}), "BUSY_UNRESPONSIVE")
 
-    @unittest.expectedFailure
-    def test_L5_pid_substring_is_not_identity(self):
-        with mock.patch.object(self.state.subprocess, "run", return_value=mock.Mock(stdout="Image Name PID\nabaqus.exe 1234")):
-            self.assertFalse(self.state._pid_alive(123))
-
-    @unittest.expectedFailure
     def test_L5_status_and_ping_must_share_session(self):
-        status = {"status": "running", "timestamp": time.time(), "pid": 111, "session_id": "X"}
-        self.assertEqual(self.probe(status, {"success": True, "data": {"session_id": "Y"}}, pid_alive=True), "STOPPED")
+        status = {"status": "running", "timestamp": time.time(), "session_id": self.sid}
+        self.assertEqual(self.probe(status, {"success": True, "data": {"session_id": "b" * 32}}), "BUSY_UNRESPONSIVE")
 
-    @unittest.expectedFailure
     def test_L5_start_batch_requires_ping_after_new_status(self):
         batch = (ROOT / "start_abaqus_agent.bat").read_text(encoding="utf-8")
-        waitloop = batch.split(":waitloop", 1)[1].split(":started", 1)[0]
-        self.assertRegex(waitloop, r"(?i)client\.py|bridge_state\.py|ping")
+        helper = (ROOT / "scripts/start_windows.py").read_text(encoding="utf-8")
+        self.assertIn("scripts\\start_windows.py", batch)
+        self.assertIn("bridge_state.state()", helper)
 
 
 class Bootstrap(unittest.TestCase):
