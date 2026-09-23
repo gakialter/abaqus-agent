@@ -129,5 +129,7 @@ order of magnitude the hand calc predicts.
 
 ## Report the check, not just the result
 
-Always state: what you compared, the FE number, the expected number, and the % difference.
+State the quantity, region and meaning of each check. Give percentage difference only for comparable numerical quantities where it is meaningful.
+
+Verification types: EXACT_ANALYTICAL_BENCHMARK, APPROX_ANALYTICAL_ESTIMATE, SANITY_CHECK, EQUILIBRIUM_CHECK, COMPATIBILITY_CHECK, TREND_CHECK, MESH_CHECK.
 If you could not run a check, say so and why — never imply a verified result that was not.

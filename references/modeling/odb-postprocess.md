@@ -65,7 +65,9 @@ If `nodeSets['FIXED']` is missing at assembly level, try
 ## Contact pressure
 
 ```python
-cp_key = [k for k in fr.fieldOutputs if k.startswith('CPRESS')][0]
+cp_keys = [k for k in fr.fieldOutputs if k.startswith('CPRESS')]
+# Inspect cp_keys and choose the exact interaction/key/region required by the task.
+cp_key = '<exact CPRESS key from cp_keys>'
 cp = fr.fieldOutputs[cp_key]
 max_cpress = max(abs(v.data) for v in cp.values)
 n_on = sum(1 for v in cp.values if abs(v.data) > 1e-6)

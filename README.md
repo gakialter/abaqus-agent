@@ -1,140 +1,29 @@
 # abaqus-agent
 
-Let an AI agent (or MCP client like Cursor / Claude Desktop) **actually control your local
-Abaqus/CAE on Windows** — build models, submit analysis jobs, wait for completion, read the
-`.odb`, and take viewport screenshots. Not just generating Abaqus scripts.
+File IPC bridge for local Abaqus/CAE 2026. External Python 3.11 uses `mcp==1.30.0` and stays separate from Abaqus Python. The Abaqus consumer runs the blocking `mcp_loop()`.
 
-Tested on **Abaqus 2026** (bundled Python 3.10). Uses a **file-based bridge**: the Abaqus
-kernel polls JSON command files, so there are no open sockets and **nothing is installed into
-Abaqus's bundled Python** and **no files in `Program Files\SIMULIA` or the License are touched**.
+## Install and use
 
-```
-Agent / MCP client
-   │  write commands/*.json, read results/*.json   (file IPC)
-   ▼
-Abaqus/CAE kernel plugin  (mcp_loop, blocking)
-   │
-   ▼
-Part → Material → Section → Assembly → Step → BC → Load → Mesh → Job → ODB → screenshot
-```
+Download the ZIP, extract it to a writable location, then run `install.bat`, `doctor.bat`, and `start_abaqus_agent.bat` in that order. `doctor.bat` reports `INSTALLED`, `BRIDGE_READY`, and `INTEGRATION_READY` separately. Before startup, `INSTALLED=true` can coexist with `BRIDGE_READY=false`.
 
-## For students / 豆包 Work 一键部署
+Import `SKILL.md` with its `references/` directory through the MCP host's supported Skill UI. Configure a local STDIO MCP connector with:
 
-完全没接触过 Agent / MCP / Git 的同学，只用这三个文件（双击即可）：
+| Field | Value |
+|---|---|
+| command | `<repo>\.venv\Scripts\python.exe` |
+| argument | `<repo>\mcp_server.py` |
+| environment | `ABAQUS_MCP_HOME=<repo>\mcp_home` |
 
-| 时机 | 文件 |
-|------|------|
-| 第一次 / 修复 | [`install.bat`](install.bat) |
-| 一键体检 | [`doctor.bat`](doctor.bat) |
-| 每天启动 | [`start_abaqus_agent.bat`](start_abaqus_agent.bat) |
+Verify tool discovery and a real ping from that host. Doubao Work integration remains **Unverified** until tested in its real UI. No hidden product directories are written by the installer.
 
-完整说明：[`bootstrap_for_doubao_work.md`](bootstrap_for_doubao_work.md) ｜ 3 分钟速记：[`QUICKSTART_FOR_STUDENTS.md`](QUICKSTART_FOR_STUDENTS.md)
+The canonical config is `<repo>/.abaqus-agent.json` with only `schema_version: 1` and `ABAQUS_CMD`. The repo location determines venv, work and IPC paths. Old config files are read only as migration inputs and retained.
 
-## Install (one command)
+## Behavior
 
-Clone this repo, then run the installer on the machine that has Abaqus:
+Commands are atomically published in `commands/`, atomically claimed into `claims/`, and results are atomically published in `results/`. One OS locked consumer owns an IPC home. A queued command can be cancelled before claim; a timeout after claim has unknown outcome and may leave a late result. Side-effecting commands are never retried automatically. There is no cross-publisher FIFO or exactly-once guarantee after a crash.
 
-```bash
-git clone https://github.com/gakialter/abaqus-agent.git
-cd abaqus-agent
-python scripts/setup_abaqus_agent.py
-```
+`submit_job` reporting Abaqus status `COMPLETED` proves solver completion only. Task completion requires the eight gates in [workflow](references/execution/workflow.md). RF is a force and CPRESS is a contact pressure; select the exact contact interaction/key and region. The historical elastic-plastic micro-test had local maximum PEEQ ~0.10; ~0.05064 was an unweighted arithmetic mean of field values, not a proven volume average. A reported RF ~27557 N has no established 0.5% analytical agreement. Historical 27683 N was a back-fit anti-example. See [errata](validation/knowledge-layer/ERRATA.md).
 
-The installer auto-detects the `abaqus` command, creates an isolated workspace
-(`~/Desktop/abaqus-agent` by default) with its own venv, pins `mcp<2`, and prints the exact
-next commands. Optional flags: `--workspace D:\abaqus-agent --abaqus-cmd abaqus`.
+## References and license
 
-## Use it
-
-1. Start Abaqus with the bridge (printed by the installer):
-   ```
-   set ABAQUS_MCP_HOME=<workspace>\mcp_home
-   abaqus cae script="<workspace>\abaqus_start_mcp.py"
-   ```
-   Wait until `<workspace>\mcp_home\status.json` shows `"status": "running"`.
-2. Verify the round-trip: `<workspace>\.venv\Scripts\python.exe <workspace>\client.py` (expect pong).
-3. Drive Abaqus from Python:
-   ```python
-   from client import send
-   send("execute_script", script="from abaqus import mdb; print(mdb.models.keys())")
-   send("submit_job", timeout=600, job_name="MyJob")
-   ```
-   For a standard MCP client, run `<workspace>\.venv\Scripts\python.exe <workspace>\mcp_server.py`.
-
-## Layers: execution vs knowledge
-
-- **Execution layer (`scripts/`)** — the validated MCP/file-IPC/kernel bridge. This is the
-  part that actually runs Abaqus. Stable; do not redesign.
-- **Knowledge layer (`references/`)** — progressive-disclosure Abaqus recipes (workflow,
-  diagnosis, verification, materials, mesh, contact, ODB post-processing, linear/nonlinear
-  static). `SKILL.md` is a thin router that picks the right file per task.
-- **Knowledge source** — adapted in part from
-  [jasonanewcoder/abaqus_skills](https://github.com/jasonanewcoder/abaqus_skills) (MIT),
-  audited, rewritten and **re-validated on this machine's Abaqus 2026**. Upstream-unverified
-  APIs are kept flagged, not silently treated as proven.
-
-## Layout
-
-```
-abaqus-agent/
-├── SKILL.md                     # agent-facing thin router (load as a skill)
-├── scripts/
-│   ├── setup_abaqus_agent.py    # one-click installer
-│   ├── abaqus_mcp_plugin.py     # Abaqus kernel bridge (patched for 2026)
-│   ├── mcp_server.py            # stdio MCP server for MCP clients
-│   ├── client.py                # direct file-IPC driver
-│   └── abaqus_start_mcp.py      # Abaqus-side launcher template
-├── references/
-│   ├── gotchas.md               # Abaqus 2026 / Windows pitfalls
-│   ├── validation_recipe.md     # cantilever beam -> job -> ODB -> screenshot
-│   ├── execution/               # workflow, error-diagnosis, verification
-│   ├── modeling/                # material, mesh, contact, odb-postprocess
-│   └── analysis/                # linear-static, nonlinear-static
-└── validation/
-    ├── result.json              # original cantilever E2E result
-    └── knowledge-layer/         # Abaqus 2026 micro-validations (material/nonlinear/contact/diagnosis)
-```
-
-## Available commands
-
-`ping`, `check_abaqus_connection`, `execute_script`, `get_model_info`, `list_jobs`,
-`submit_job`, `get_odb_info`, `get_viewport_image`.
-
-## Adaptation & changelog (validated on Abaqus 2026)
-
-Bundles [Cai-aa/abaqus-mcp v4.0](https://github.com/Cai-aa/abaqus-mcp) (MIT) with fixes
-validated end-to-end on Abaqus/CAE 2026 (Python 3.10):
-
-- `get_viewport_image`: extensionless basename (printToFile adds its own extension) +
-  `abaqusConstants.PNG/SVG/TIFF`; the real on-disk file is discovered and returned.
-- `submit_job`: returns `success=true` only when the final status is `COMPLETED`;
-  ABORTED/TERMINATED/ERROR return `success=false` with the final status kept.
-- `mcp_loop()` stop instruction points at the real `<workspace>/mcp_home/stop.flag`.
-- `ABAQUS_MCP_HOME` has a single source of truth: `<workspace>/mcp_home` for the plugin,
-  client and MCP server. The installer writes `mcp_client_config.json` with that env embedded.
-- Recommended mode is blocking `mcp_loop()` (background thread mode is experimental).
-- External server pins `mcp<2` (the bundled code uses FastMCP v1).
-
-Validation: a 100x10x10 mm cantilever ran build -> mesh -> job -> ODB -> contour screenshot;
-job COMPLETED, max displacement 0.403 mm, max von Mises 100.2 MPa.
-
-Knowledge-layer micro-validations (Abaqus 2026, see `validation/knowledge-layer/`):
-- **Elastic-plastic**: EPP table `((250,0),(250,0.5))`, `nlgeom=ON`, displacement control ->
-  COMPLETED, Mises pinned at 250 MPa, PEEQ=0.10, RF=27.56 kN (true-stress check within 0.5%).
-- **Contact**: frictionless deformable cube on a discrete rigid platen -> CPRESS=4086 MPa
-  (expected 4200), RF balanced; documented the 2026 `main=`/`secondary=` rename and the
-  requirement to mesh rigid parts.
-- **Diagnosis**: deliberately under-constrained cube -> ABORTED; `.sta` exponential cutbacks
-  + `.msg` `NUMERICAL SINGULARITY` at free nodes, mapped to missing BCs.
-
-
-## Disclaimer / safety
-
-- `execute_script` runs arbitrary Python in the Abaqus kernel - only use with trusted scripts
-  and never expose this to the public internet.
-- Does not include Abaqus, a license, or any commercial model data. You need your own legal
-  Abaqus install and license.
-
-## License
-
-MIT. Bundles upstream MIT code from Cai-aa/abaqus-mcp; see `LICENSE` and `NOTICE.md`.
+[SKILL.md](SKILL.md) routes knowledge recipes. The [knowledge layer](references/execution/workflow.md) marks API evidence at recipe level. `execute_script` runs trusted Python in the Abaqus kernel; do not expose this bridge to the public internet. Abaqus and its license are not included. MIT; see [NOTICE](NOTICE.md).

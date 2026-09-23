@@ -12,7 +12,7 @@
 | `<job>.msg` | solver warnings/errors, `NUMERICAL SINGULARITY`, contact iterations, cutback reasons |
 | `<job>.dat` | input echo, `***ERROR` blocks, element-set / surface errors |
 | `<job>.log` | job lifecycle, license, pre-processor stage |
-| `<job>.odb` | only trustworthy if COMPLETED; may hold partial frames if it died mid-step |
+| `<job>.odb` | partial frames may diagnose a failed job; not a final validated result |
 
 Quick kernel snippet to dump the tail:
 ```python

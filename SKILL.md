@@ -25,21 +25,26 @@ Part → Material → Section → Assembly → Step → BC → Load → Mesh →
 
 ## One-time install
 
+Download the ZIP and extract it to a writable location. Run `install.bat`,
+`doctor.bat`, then `start_abaqus_agent.bat`. Import this Skill through the
+host product's supported UI and configure its local STDIO MCP connector:
+command `<repo>\.venv\Scripts\python.exe`, argument `<repo>\mcp_server.py`,
+environment `ABAQUS_MCP_HOME=<repo>\mcp_home`. Verify discovery and ping in the
+real host. Doubao Work integration remains Unverified until its UI is tested.
+
 ```bash
-python scripts/setup_abaqus_agent.py
-# optional: --workspace D:\abaqus-agent  --abaqus-cmd abaqus
+install.bat
 ```
 Do **not** install into Abaqus's bundled Python and do **not** touch
 `C:\Program Files\SIMULIA` or the License.
 
 ## Daily startup (3 steps)
 
-1. Start Abaqus with the bridge:
+1. Start Abaqus with the bridge using `start_abaqus_agent.bat`:
    ```
-   set ABAQUS_MCP_HOME=<workspace>\mcp_home
-   abaqus cae script="<workspace>\abaqus_start_mcp.py"
+   start_abaqus_agent.bat
    ```
-   Wait ~20–40 s until `mcp_home\status.json` shows `"status": "running"`.
+   Wait for `BRIDGE_READY`, which verifies owner, status and real ping.
 2. Verify the round-trip: `<workspace>\.venv\Scripts\python.exe <workspace>\client.py` (expect pong).
 3. Drive Abaqus:
    ```python
@@ -87,8 +92,7 @@ A job `COMPLETED` is only **Gate C (solver reached the end)**. You may write
 "analysis completed and validated" only after all eight phases pass — see
 [execution/workflow.md](references/execution/workflow.md):
 
-`A Problem fidelity → B Model validity → C Solver completion → D Result extraction → E Physics verification → F Reporting consistency`
-plus the pre-run **output-request gate** and the **requirement-compliance gate**.
+`G1 Problem Fidelity → G2 Requirement Compliance → G3 Pre-run Output → G4 Solver Completion → G5 Result Interpretation → G6 Verification → G7 Report Consistency → G8 Completion`.
 If only C is true, write "solver completed" and name the gates that did not pass.
 
 ## Hard rules for an engineering / course task
@@ -107,7 +111,7 @@ If only C is true, write "solver completed" and name the gates that did not pass
    state, and never mix jobs/frames/regions.
 3. **Request required outputs before solving.** If the task wants CPRESS / a punch RP
    reaction / a time history, confirm the ODB output request exists **before** `submit_job`
-   (workflow GATE 3a). An unrequested result cannot be inferred afterward.
+   (workflow G3). An unrequested result cannot be inferred afterward.
 4. **Do not auto-"fix" convergence by changing the problem** (material strength, friction,
    geometry, load, BC values) unless the original choice was itself a modeling error.
 5. **Report like an auditor.** Every number/unit/sign/radius-vs-diameter/engineering-vs-true
