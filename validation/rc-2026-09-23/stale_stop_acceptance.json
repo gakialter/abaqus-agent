@@ -1,0 +1,29 @@
+{
+  "stale_flag_ping": {
+    "id": "613405172dae4b649eddb153e73d0bce",
+    "success": true,
+    "timestamp": 1790153848.7494364,
+    "data": {
+      "response": "pong",
+      "version": "4.0.0",
+      "session_id": "b2e660ffcd214f7bba5ef4bec1f83282"
+    }
+  },
+  "stale_command_stop": {
+    "id": "8502442252c64251a0364971bf237d7b",
+    "success": false,
+    "timestamp": 1790153848.8569648,
+    "error": "Stop request session does not own this bridge"
+  },
+  "after_stale_stop_ping": {
+    "id": "8e60ba71c16c43c781bc20efe99c66e0",
+    "success": true,
+    "timestamp": 1790153848.9649363,
+    "data": {
+      "response": "pong",
+      "version": "4.0.0",
+      "session_id": "b2e660ffcd214f7bba5ef4bec1f83282"
+    }
+  },
+  "current_owner": "b2e660ffcd214f7bba5ef4bec1f83282"
+}

@@ -1,0 +1,32 @@
+{
+  "claimed_A": true,
+  "A": {
+    "success": false,
+    "error": "Timeout after 0.5s (cmd=execute_script)",
+    "execution_state": "UNKNOWN_MAY_CONTINUE",
+    "command_id": "5e72e5aabe6d477e984a7a675757d1f4"
+  },
+  "B": {
+    "id": "88862779494b445da8d2b597d3ed69d8",
+    "success": true,
+    "output": "B",
+    "error": null,
+    "timestamp": 1790153324.9100854
+  },
+  "C": {
+    "id": "90ebdc8fb0414f02bd642be4b8a7698b",
+    "success": true,
+    "output": "C",
+    "error": null,
+    "timestamp": 1790153325.017939
+  },
+  "marker": [
+    "A",
+    "B",
+    "C"
+  ],
+  "late_result_ids": [
+    "5e72e5aabe6d477e984a7a675757d1f4"
+  ],
+  "claims_remaining": []
+}

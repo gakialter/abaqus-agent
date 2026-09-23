@@ -1,0 +1,7 @@
+{
+  "id": "3e1dcd307fe2434b9c1c9622f70beae1",
+  "success": true,
+  "output": "{\"interactions\": [\"Cont1\"], \"exact_key_present\": true, \"cp_values\": 157, \"rf_values\": 338, \"gravity_region\": \"('_PickedSet14', 'Assembly', 1, 1, 1)\", \"density\": \"((7.85e-09,),)\"}",
+  "error": null,
+  "timestamp": 1790153670.6958249
+}

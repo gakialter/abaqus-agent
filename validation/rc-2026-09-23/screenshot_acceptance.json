@@ -1,0 +1,76 @@
+{
+  "png1": {
+    "command_success": true,
+    "command_id": "dfa20efcc0b241ed8ea35ee07d93777a",
+    "data": {
+      "success": true,
+      "format": "png",
+      "extension": ".png",
+      "mime_type": "image/png",
+      "bytes": 246,
+      "sha256": "ca9e74e06b0857111a30ccaa773e4a7b11c49d39ca7a6bcff271db73201e6908",
+      "signature": "89504e470d0a1a0a0000000d"
+    },
+    "error": null
+  },
+  "png2": {
+    "command_success": true,
+    "command_id": "139be380cc024f03a82eb279e51b4c10",
+    "data": {
+      "success": true,
+      "format": "png",
+      "extension": ".png",
+      "mime_type": "image/png",
+      "bytes": 246,
+      "sha256": "ca9e74e06b0857111a30ccaa773e4a7b11c49d39ca7a6bcff271db73201e6908",
+      "signature": "89504e470d0a1a0a0000000d"
+    },
+    "error": null
+  },
+  "svg": {
+    "command_success": true,
+    "command_id": "229dce9b3a6842769f851649cb5ad4ea",
+    "data": {
+      "success": true,
+      "format": "svg",
+      "extension": ".svg",
+      "mime_type": "image/svg+xml",
+      "bytes": 435,
+      "sha256": "7aadbd05a5b5b5f991f5d6a415fd4ebe6d20e76b4cd029455219ad88454399ba",
+      "signature": "3c3f786d6c2076657273696f"
+    },
+    "error": null
+  },
+  "tiff": {
+    "command_success": true,
+    "command_id": "b8cf96f472264442bd106ecb15076d77",
+    "data": {
+      "success": true,
+      "format": "tiff",
+      "extension": ".tif",
+      "mime_type": "image/tiff",
+      "bytes": 14762,
+      "sha256": "163504a770368e9b17189f60ba93336203427d56e5759f2423c28c73a085bfd2",
+      "signature": "4d4d002a00002f9081008100"
+    },
+    "error": null
+  },
+  "tif": {
+    "command_success": false,
+    "command_id": "dab25b180b384bf886729e4de3b1a44d",
+    "data": {
+      "success": false,
+      "error": "Unsupported image format: TIF"
+    },
+    "error": null
+  },
+  "unsupported": {
+    "command_success": false,
+    "command_id": "d872dc07e9e2464ca2303ac926180916",
+    "data": {
+      "success": false,
+      "error": "Unsupported image format: JPEG"
+    },
+    "error": null
+  }
+}

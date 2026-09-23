@@ -1,0 +1,27 @@
+{
+  "build": {
+    "id": "20f460bf0a474b4b9e65c24d57968b6e",
+    "success": true,
+    "output": "{\"built\": true, \"nelem\": 125, \"nnode\": 216}",
+    "error": null,
+    "timestamp": 1790153383.8250475
+  },
+  "job": {
+    "id": "01399acfed814cab8bdce7feaad19a0e",
+    "success": true,
+    "timestamp": 1790153384.0099337,
+    "data": {
+      "success": true,
+      "job": "EppJob",
+      "status": "COMPLETED",
+      "error": null
+    }
+  },
+  "fields": {
+    "id": "ef3b786b30414c4c9bb43c970ea37fdf",
+    "success": true,
+    "output": "{'fields': ['AC YIELD', 'LE', 'PE', 'PEEQ', 'PEMAG', 'RF', 'S', 'U'], 'frames': 13}",
+    "error": null,
+    "timestamp": 1790153408.5477881
+  }
+}
