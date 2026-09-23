@@ -3,7 +3,7 @@ REM ============================================================
 REM  abaqus-agent - one-click install (double-click this file)
 REM  English-only console output on purpose (codepage-safe).
 REM ============================================================
-setlocal
+setlocal DisableDelayedExpansion
 set "REPO=%~dp0"
 
 REM --- find a system Python to run the bootstrap ---
@@ -14,14 +14,14 @@ if not defined PY (
 )
 if not defined PY (
   echo [!!] No Python found.
-  echo     Install Python 3.11-3.13 first, then run install.bat again.
+  echo     Install external Python 3.11 first, then run install.bat again.
   echo.
   pause
   exit /b 1
 )
 
 echo Using Python launcher: %PY%
-echo Repo: %REPO%
+echo Repo: "%REPO%"
 echo.
 
 "%PY%" "%REPO%scripts\bootstrap_windows.py"
@@ -29,7 +29,7 @@ set "RC=%ERRORLEVEL%"
 
 echo.
 if "%RC%"=="0" (
-  echo [OK] install finished. Next: double-click start_abaqus_agent.bat
+  echo [OK] install finished. Next: double-click doctor.bat, then start_abaqus_agent.bat
 ) else (
   echo [!!] install did not complete. Read the messages above, fix, and re-run.
   echo     If unsure, double-click doctor.bat

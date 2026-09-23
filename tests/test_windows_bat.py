@@ -7,7 +7,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from tests.support import archive_to, temp_home
+from tests.support import ROOT, archive_to, temp_home
 
 
 @unittest.skipUnless(os.name == "nt", "Windows cmd.exe boundary")
@@ -28,12 +28,13 @@ class WindowsBatBoundary(unittest.TestCase):
                                "Path(os.environ['D6_ARG_LOG']).write_text(json.dumps(sys.argv[1:], ensure_ascii=False), encoding='utf-8')\n",
                                encoding="utf-8")
             (fake_bin / "py.cmd").write_text('@echo off\n"%D6_REAL_PY%" "%D6_CAPTURE%" %*\n', encoding="ascii")
-            for label in self.PATH_CASES:
+            for index, label in enumerate((*self.PATH_CASES, "Abaqus ! Test")):
                 with self.subTest(path=label):
                     repo = root / label
                     repo.mkdir()
                     archive_to(repo)
-                    log = root / (str(self.PATH_CASES.index(label)) + ".json")
+                    (repo / "install.bat").write_bytes((ROOT / "install.bat").read_bytes())
+                    log = root / (str(index) + ".json")
                     env = {**os.environ, "PATH": str(fake_bin) + os.pathsep + os.environ.get("PATH", ""),
                            "TEMP": str(root), "TMP": str(root), "D6_REAL_PY": sys.executable,
                            "D6_CAPTURE": str(capture), "D6_ARG_LOG": str(log)}

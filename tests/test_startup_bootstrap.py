@@ -85,11 +85,12 @@ class Bootstrap(unittest.TestCase):
                 self.assertFalse((dst / "work").exists())
                 self.assertTrue((dst / "SKILL.md").exists())
 
-    @unittest.expectedFailure
     def test_L6_clean_archive_preflight_passes(self):
         with temp_home() as repo:
             bootstrap = load("d6_bootstrap_preflight", "scripts/bootstrap_windows.py")
             archive_to(repo)
+            for name in ("local_config.py", "runtime_detection.py"):
+                (repo / "scripts" / name).write_bytes((ROOT / "scripts" / name).read_bytes())
             with mock.patch.object(bootstrap, "REPO", repo):
                 self.assertEqual(bootstrap.verify_repo_files(), [])
 
@@ -98,11 +99,11 @@ class Bootstrap(unittest.TestCase):
         with temp_home() as repo, mock.patch.object(bootstrap, "REPO", repo), \
              mock.patch.object(bootstrap, "CONFIG_PATH", repo / "user.json"):
             self.assertFalse(bootstrap.already_ready())
-            with mock.patch.object(bootstrap, "detect_abaqus", return_value=None):
+            with mock.patch.object(bootstrap.runtime_detection, "detect_abaqus", return_value=None):
                 self.assertIsNone(bootstrap.resolve_abaqus_cmd(interactive=False))
 
     def test_L6_one_fake_bat_or_exe_candidate_auto_selects(self):
-        setup = load("d6_setup_detection", "setup_abaqus_agent.py")
+        setup = load("d6_setup_detection", "scripts/runtime_detection.py")
         with temp_home() as home:
             for name in ("Abaqus Agent Test/fake abaqus.bat", "中文 测试/fake abaqus.exe"):
                 executable = home / name
@@ -111,9 +112,8 @@ class Bootstrap(unittest.TestCase):
                 with mock.patch.object(setup, "which", side_effect=lambda candidate: str(executable) if candidate == "abaqus" else None):
                     self.assertEqual(setup.detect_abaqus(), str(executable))
 
-    @unittest.expectedFailure
     def test_L6_multiple_abaqus_candidates_are_not_silently_selected(self):
-        setup = load("d61_setup_ambiguous", "setup_abaqus_agent.py")
+        setup = load("d61_setup_ambiguous", "scripts/runtime_detection.py")
         with temp_home() as home:
             first, second = home / "one.bat", home / "two.exe"
             first.write_bytes(b"fake")
@@ -126,27 +126,24 @@ class Bootstrap(unittest.TestCase):
                     return  # explicit ambiguity is acceptable
             self.assertNotEqual(selected, str(first))
 
-    @unittest.expectedFailure
     def test_L6_unexpected_abaqus_command_arguments_are_invalid(self):
         bootstrap = load("d61_bootstrap_args", "scripts/bootstrap_windows.py")
         with temp_home() as home:
             fake = home / "fake abaqus.bat"
             fake.write_text("@echo off\n", encoding="ascii")
-            with mock.patch.object(bootstrap, "detect_abaqus", return_value=None), \
+            with mock.patch.object(bootstrap.runtime_detection, "detect_abaqus", return_value=None), \
                  mock.patch("builtins.input", return_value=str(fake) + " --unexpected"):
                 self.assertIsNone(bootstrap.resolve_abaqus_cmd(interactive=True))
 
-    @unittest.expectedFailure
-    def test_L7_external_python_310_is_not_rejected_by_version_alone(self):
-        setup = load("d6_setup_python", "setup_abaqus_agent.py")
+    def test_L7_release_python_is_311_only(self):
+        setup = load("d6_setup_python", "scripts/runtime_detection.py")
         def fake_run(args, **kwargs):
-            stdout = "-V:3.10 C:\\ExternalPython310\\python.exe\n" if args == ["py", "-0"] else "3.10\n"
+            stdout = "3.10\n"
             return subprocess.CompletedProcess(args, 0, stdout, "")
         with mock.patch.object(setup.subprocess, "run", side_effect=fake_run), \
-             mock.patch.object(setup, "which", return_value=None):
-            self.assertEqual(setup.detect_python(), ["py", "-3.10"])
+             mock.patch.object(setup, "which", side_effect=lambda name: name):
+            self.assertIsNone(setup.detect_python())
 
-    @unittest.expectedFailure
     def test_L6_partial_venv_is_not_ready(self):
         bootstrap = load("d6_bootstrap_partial", "scripts/bootstrap_windows.py")
         with temp_home() as repo, mock.patch.object(bootstrap, "REPO", repo), \
@@ -159,23 +156,22 @@ class Bootstrap(unittest.TestCase):
             (repo / "references").mkdir()
             self.assertFalse(bootstrap.already_ready())
 
-    @unittest.expectedFailure
     def test_L6_repeated_bootstrap_preserves_user_config(self):
         bootstrap = load("d6_bootstrap_config", "scripts/bootstrap_windows.py")
         with temp_home() as repo, mock.patch.object(bootstrap, "REPO", repo), \
              mock.patch.object(bootstrap, "CONFIG_PATH", repo / "user.json"), \
-             mock.patch.object(bootstrap, "LOCAL_ENV", repo / ".abaqus-agent.local"):
-            (repo / "user.json").write_text('{"abaqus_cmd":"custom.bat","note":"user"}')
+             mock.patch("runtime_detection.validate_abaqus_cmd", return_value="custom.bat"):
+            original = '{"schema_version":1,"ABAQUS_CMD":"custom.bat"}\n'
+            (repo / "user.json").write_text(original)
             bootstrap.write_config(str(repo / ".venv" / "Scripts" / "python.exe"), "custom.bat")
-            self.assertEqual(json.loads((repo / "user.json").read_text())["note"], "user")
+            self.assertEqual((repo / "user.json").read_text(), original)
 
-    @unittest.expectedFailure
     def test_L8_single_config_is_move_safe(self):
         bootstrap = load("d6_bootstrap_move", "scripts/bootstrap_windows.py")
         with temp_home() as repo, mock.patch.object(bootstrap, "REPO", repo), \
              mock.patch.object(bootstrap, "CONFIG_PATH", repo / "user.json"), \
-             mock.patch.object(bootstrap, "LOCAL_ENV", repo / ".abaqus-agent.local"):
+             mock.patch.object(bootstrap.runtime_detection, "validate_abaqus_cmd", return_value="fake.bat"):
             bootstrap.write_config(str(repo / ".venv" / "Scripts" / "python.exe"), "fake.bat")
             cfg = json.loads((repo / "user.json").read_text())
-            self.assertEqual(cfg, {"abaqus_cmd": "fake.bat"})
+            self.assertEqual(cfg, {"schema_version": 1, "ABAQUS_CMD": "fake.bat"})
             self.assertFalse((repo / ".abaqus-agent.local").exists())

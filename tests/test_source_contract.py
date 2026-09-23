@@ -20,14 +20,15 @@ class SourceContract(unittest.TestCase):
         for target in re.findall(r"\]\((references/[^)#]+)\)", skill):
             self.assertIn(str(PurePosixPath(target)), files)
 
-    @unittest.expectedFailure
     def test_L1_clean_archive_bootstrap_needs_no_runtime_directory(self):
         with temp_home() as home:
             bootstrap = load("d6_bootstrap_clean", "scripts/bootstrap_windows.py")
             from unittest import mock
             with mock.patch.object(bootstrap, "REPO", home):
                 for name in bootstrap.REQUIRED_FILES:
-                    (home / name).write_text("fixture", encoding="utf-8")
+                    target = home / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text("fixture", encoding="utf-8")
                 (home / "references").mkdir()
                 self.assertEqual(bootstrap.verify_repo_files(), [])
 

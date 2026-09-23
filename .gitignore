@@ -4,6 +4,8 @@ __pycache__/
 *.pyo
 *.pyd
 .venv/
+.venv.replacement-*/
+.venv.previous-*/
 venv/
 
 # Abaqus runtime
@@ -21,6 +23,7 @@ work/
 # Bootstrap / install-generated local artifacts (never commit)
 mcp_client_config.json
 .abaqus-agent.local
+.abaqus-agent.json
 doubao_skill_install.txt
 abaqus-agent.bak-*/
 *.bak-*

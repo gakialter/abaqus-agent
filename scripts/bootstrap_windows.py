@@ -1,340 +1,183 @@
 # -*- coding: utf-8 -*-
-"""
-Zero-base Windows bootstrap for abaqus-agent.
-
-This is the "one-click" installer behind install.bat. It REUSES the detection
-logic from setup_abaqus_agent.py (detect_python / detect_abaqus) but targets
-the REPO ITSELF as the workspace instead of copying files out to a new
-directory. That keeps the repo as the single source of truth and, crucially,
-does NOT overwrite the newer root-level bridge files (plugin / mcp_server)
-that an older scripts/ copy would clobber.
-
-What it does:
-  1. Locate the repo root (%~dp0..  / parent of this file).
-  2. Detect a system Python (reused from setup_abaqus_agent.detect_python).
-  3. Detect Abaqus (reused from setup_abaqus_agent.detect_abaqus); ask the
-     user to type a command/path if it cannot be found automatically.
-  4. Create an isolated .venv inside the repo and install mcp<2 into it
-     (never into Abaqus's bundled Python).
-  5. Verify the bridge files / skill files are present.
-  6. Write a user-local config: %USERPROFILE%\\.abaqus-agent.local.json
-     (workspace, abaqus command, python, skill source - NO secrets).
-  7. Install/sync the Skill (SKILL.md + references/) into any detected
-     Doubao Work skill runtime; if no runtime is detected, write
-     doubao_skill_install.txt with the manual fallback.
-  8. Print a simple [OK] summary.
-
-Idempotent. Never touches Abaqus install dirs or the License.
-"""
+"""Install the repo-local Windows environment from a source-only ZIP."""
 import argparse
-import datetime as _dt
 import json
-import os
-import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent          # scripts/
-REPO = HERE.parent                              # repo root = workspace
-CONFIG_PATH = Path(os.environ.get("USERPROFILE", str(Path.home()))) / ".abaqus-agent.local.json"
-LOCAL_ENV = REPO / ".abaqus-agent.local"        # BAT-sourced, gitignored
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import local_config
+import runtime_detection
 
-# Reuse existing detection logic instead of reinventing it.
-sys.path.insert(0, str(HERE))
-try:
-    import setup_abaqus_agent as _setup
-    detect_python = _setup.detect_python
-    detect_abaqus = _setup.detect_abaqus
-except Exception as _e:  # pragma: no cover - degrade gracefully
-    print("[!] Could not import setup_abaqus_agent: %s" % _e)
-    detect_python = None
-    detect_abaqus = None
+REPO = Path(__file__).resolve().parent.parent
+CONFIG_PATH = REPO / ".abaqus-agent.json"
+LOCAL_ENV = REPO / ".abaqus-agent.local"  # legacy text input; never execute
+MCP_VERSION = "1.30.0"
 
-
-def info(msg):
-    print(msg)
-
-
-def ok(msg):
-    print("[OK] " + msg)
-
-
-def warn(msg):
-    print("[!!] " + msg)
-
-
-# ---------------------------------------------------------------------------
-# Detection
-# ---------------------------------------------------------------------------
-
-def pick_venv_python():
-    """Return a command list to launch the base interpreter used to make the venv."""
-    if detect_python is None:
-        return None
-    return detect_python()
-
-
-def resolve_abaqus_cmd(interactive):
-    abq = detect_abaqus() if detect_abaqus else None
-    if abq:
-        return abq
-    if not interactive:
-        return None
-    print()
-    print("[!] Abaqus command not found automatically.")
-    print("    Type the abaqus command or the full path to abaqus.bat, then press Enter.")
-    print("    Examples:")
-    print("      abaqus")
-    print("      D:\\SIMULIA\\EstProducts\\2026\\win_b64\\code\\bin\\abq2026.bat")
-    try:
-        val = input("    abaqus command/path> ").strip().strip('"')
-    except EOFError:
-        val = ""
-    return val or None
-
-
-# ---------------------------------------------------------------------------
-# .venv (isolated, never Abaqus Python)
-# ---------------------------------------------------------------------------
-
-def ensure_venv(base_cmd):
-    venv_py = REPO / ".venv" / "Scripts" / "python.exe"
-    if venv_py.exists():
-        # Sanity: can it run and import mcp?
-        try:
-            r = subprocess.run([str(venv_py), "-c", "import mcp, sys; print(sys.version)"],
-                               capture_output=True, text=True)
-            if r.returncode == 0:
-                return str(venv_py)
-            warn("Existing .venv is broken; rebuilding it.")
-            shutil.rmtree(REPO / ".venv", ignore_errors=True)
-        except Exception:
-            shutil.rmtree(REPO / ".venv", ignore_errors=True)
-
-    if not base_cmd:
-        return None
-    info("     Creating isolated .venv inside the repo (one time, may take a minute)...")
-    subprocess.run(base_cmd + ["-m", "venv", str(REPO / ".venv")], check=True)
-    subprocess.run([str(venv_py), "-m", "pip", "install", "--upgrade", "pip"], check=True)
-    subprocess.run([str(venv_py), "-m", "pip", "install", "mcp<2"], check=True)
-    return str(venv_py)
-
-
-# ---------------------------------------------------------------------------
-# Verification of shipped files
-# ---------------------------------------------------------------------------
-
-REQUIRED_FILES = [
-    "SKILL.md",
-    "client.py",
-    "mcp_server.py",
-    "abaqus_mcp_plugin.py",
-    "abaqus_start_mcp.py",
-]
-REQUIRED_DIRS = ["references", "mcp_home"]
+REQUIRED_FILES = (
+    "SKILL.md", "client.py", "mcp_server.py", "abaqus_mcp_plugin.py",
+    "abaqus_start_mcp.py", "install.bat", "doctor.bat", "start_abaqus_agent.bat",
+    "scripts/bootstrap_windows.py", "scripts/doctor.py", "scripts/bridge_state.py",
+    "scripts/local_config.py", "scripts/runtime_detection.py",
+)
+REQUIRED_DIRS = ("references",)
 
 
 def verify_repo_files():
-    missing = []
-    for f in REQUIRED_FILES:
-        if not (REPO / f).is_file():
-            missing.append(f)
-    for d in REQUIRED_DIRS:
-        if not (REPO / d).is_dir():
-            missing.append(d + "/")
+    missing = [name for name in REQUIRED_FILES if not (REPO / name).is_file()]
+    missing += [name + "/" for name in REQUIRED_DIRS if not (REPO / name).is_dir()]
     return missing
 
 
-# ---------------------------------------------------------------------------
-# Skill install / sync
-# ---------------------------------------------------------------------------
-
-def skill_runtime_candidates():
-    """Known Doubao Work skill roots, derived from env (no hard-coded username)."""
-    cands = []
-    local = os.environ.get("LOCALAPPDATA", "")
-    home = os.environ.get("USERPROFILE", "")
-    if local:
-        cands.append(os.path.join(
-            local, r"DoubaoWork\User Data\Default\.doubaowork\agent_mode\workspace\.user_skills"))
-        cands.append(os.path.join(
-            local, r"DoubaoWork\User Data\Default\.doubaowork\agent_mode\workspace\.skills"))
-    if home:
-        cands.append(os.path.join(home, "DoubaoWork", "skills"))
-        cands.append(os.path.join(home, ".agents", "skills"))
-    return [c for c in cands if os.path.isdir(c)]
+def _venv_python(directory):
+    return directory / "Scripts" / "python.exe"
 
 
-def sync_skill_to_runtime(runtime_root):
-    target = Path(runtime_root) / "abaqus-agent"
-    # Lightweight backup if a previous version exists.
-    if target.exists():
-        stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = Path(runtime_root) / ("abaqus-agent.bak-" + stamp)
-        try:
-            shutil.copytree(str(target), str(backup))
-            info("     Backed up existing skill to %s" % backup)
-        except Exception as e:
-            warn("Could not back up old skill (%s); overwriting anyway." % e)
-        shutil.rmtree(str(target), ignore_errors=True)
-
-    target.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(str(REPO / "SKILL.md"), str(target / "SKILL.md"))
-    shutil.copytree(str(REPO / "references"), str(target / "references"))
-    return str(target)
-
-
-def write_fallback_install_text():
-    txt = REPO / "doubao_skill_install.txt"
-    txt.write_text(
-        "abaqus-agent skill auto-install\n"
-        "================================\n"
-        "No Doubao Work skill runtime folder was detected automatically.\n"
-        "In Doubao Work, paste the self-install prompt from\n"
-        "bootstrap_for_doubao_work.md (section: give to Doubao Work),\n"
-        "which asks Work to detect its own runtime and sync SKILL.md + references/.\n"
-        "Repository (single source of truth):\n  %s\n" % str(REPO),
-        encoding="utf-8",
+def venv_is_ready(directory):
+    python = _venv_python(directory)
+    if not python.is_file():
+        return False
+    code = (
+        "import json,sys,importlib.metadata as md; "
+        "from mcp.server.fastmcp import FastMCP; "
+        "print(json.dumps({'version':list(sys.version_info[:2]),"
+        "'prefix':sys.prefix,'base_prefix':sys.base_prefix,"
+        "'mcp':md.version('mcp')}))"
     )
-    return str(txt)
+    try:
+        result = subprocess.run([str(python), "-c", code], capture_output=True,
+                                text=True, timeout=20)
+        if result.returncode != 0:
+            return False
+        data = json.loads(result.stdout.strip().splitlines()[-1])
+        return (data["version"] == [3, 11] and data["mcp"] == MCP_VERSION
+                and Path(data["prefix"]).resolve() == directory.resolve()
+                and data["prefix"] != data["base_prefix"])
+    except (OSError, ValueError, KeyError, IndexError, subprocess.TimeoutExpired):
+        return False
 
-
-
-def choose_skill_runtime(runtimes):
-    if len(runtimes) <= 1:
-        return list(runtimes)
-    already = [r for r in runtimes if (Path(r) / 'abaqus-agent').exists()]
-    if len(already) == 1:
-        return already
-    return []
-
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-def write_config(venv_py, abq_cmd):
-    cfg = {
-        "config_version": 1,
-        "workspace": str(REPO),
-        "mcp_home": str(REPO / "mcp_home"),
-        "venv_python": str(venv_py) if venv_py else "",
-        "abaqus_cmd": abq_cmd or "",
-        "skill_source": str(REPO),
-        "installed_at": _dt.datetime.now().isoformat(timespec="seconds"),
-    }
-    CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    # BAT-sourced mini config (start_abaqus_agent.bat reads this; no JSON parse needed).
-    LOCAL_ENV.write_text(
-        "@rem auto-generated by bootstrap_windows.py - safe to delete, recreated by install.bat\n"
-        'set "ABAQUS_CMD=%s"\n' % (abq_cmd or "abaqus"),
-        encoding="utf-8",
-    )
-    return str(CONFIG_PATH)
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def already_ready():
-    venv_py = REPO / ".venv" / "Scripts" / "python.exe"
-    return (venv_py.exists() and CONFIG_PATH.exists()
-            and (REPO / "SKILL.md").is_file() and (REPO / "references").is_dir())
+    try:
+        config = local_config.read_config(CONFIG_PATH)
+        runtime_detection.validate_abaqus_cmd(config["ABAQUS_CMD"])
+    except (OSError, ValueError, KeyError):
+        return False
+    return (not verify_repo_files() and venv_is_ready(REPO / ".venv")
+            and (REPO / "mcp_home").is_dir() and (REPO / "work").is_dir())
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--yes", action="store_true", help="non-interactive (no repair/quit prompt)")
-    ap.add_argument("--dry-run", action="store_true", help="print actions, do not write anything")
-    args = ap.parse_args()
+def ensure_venv(base_cmd):
+    """Build and verify a sibling before moving any existing .venv."""
+    target = REPO / ".venv"
+    if venv_is_ready(target):
+        return _venv_python(target)
+    if not base_cmd:
+        raise RuntimeError("External Python 3.11 was not found")
 
-    print("=" * 60)
-    print(" abaqus-agent bootstrap  (repo: %s)" % REPO)
-    print("=" * 60)
+    replacement = REPO / (".venv.replacement-" + uuid.uuid4().hex)
+    previous = REPO / (".venv.previous-" + uuid.uuid4().hex)
+    print("Creating replacement venv: " + str(replacement))
+    subprocess.run(list(base_cmd) + ["-m", "venv", str(replacement)], check=True)
+    subprocess.run([str(_venv_python(replacement)), "-m", "pip", "install",
+                    "mcp==" + MCP_VERSION], check=True)
+    if not venv_is_ready(replacement):
+        raise RuntimeError("Replacement venv failed Python 3.11 / FastMCP / mcp==1.30.0 checks; old .venv kept")
 
-    # Idempotency: existing install?
-    if already_ready() and not args.yes and not args.dry_run:
-        print("Existing installation detected.")
-        ans = input("  [R] repair/update  or  [Q] quit ? [R] ").strip().lower()
-        if ans == "q":
-            print("Aborted. Nothing changed.")
-            return 0
+    moved_old = False
+    try:
+        if target.exists():
+            target.rename(previous)
+            moved_old = True
+        replacement.rename(target)
+        if not venv_is_ready(target):
+            raise RuntimeError("Switched venv failed validation")
+    except Exception as exc:
+        if moved_old:
+            try:
+                if target.exists():
+                    target.rename(replacement)
+                previous.rename(target)
+            except OSError as restore_error:
+                raise RuntimeError("Venv switch failed; old environment is at %s; restore failed: %s" %
+                                   (previous, restore_error)) from exc
+        raise RuntimeError("Venv switch failed safely; old environment kept: %s" % exc) from exc
+    if moved_old:
+        print("Previous venv retained at: " + str(previous))
+    return _venv_python(target)
 
-    # 1) Verify repo files
+
+def resolve_abaqus_cmd(interactive, existing=None):
+    if existing:
+        return runtime_detection.validate_abaqus_cmd(existing)
+    try:
+        found = runtime_detection.detect_abaqus()
+    except ValueError as exc:
+        if not interactive:
+            raise
+        print("[!!] " + str(exc))
+        found = None
+    if found:
+        return found
+    if not interactive:
+        return None
+    try:
+        entered = input("Abaqus .bat/.exe full path or command name> ").strip()
+        return runtime_detection.validate_abaqus_cmd(entered) if entered else None
+    except (EOFError, ValueError) as exc:
+        print("[!!] Invalid Abaqus command: " + str(exc))
+        return None
+
+
+def write_config(_venv_py, abq_cmd):
+    # Keep the old callable signature for the D6 harness; no derived path is stored.
+    return local_config.write_config(CONFIG_PATH, abq_cmd)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--yes", action="store_true", help="repair without a prompt")
+    parser.add_argument("--dry-run", action="store_true", help="inspect without writing")
+    args = parser.parse_args(argv)
+
     missing = verify_repo_files()
     if missing:
-        warn("Missing files in repo: %s" % ", ".join(missing))
-        warn("Did you download the whole ZIP and unzip it completely?")
+        print("[!!] Missing source: " + ", ".join(missing))
         return 1
-    ok("Repository files present")
+    try:
+        config, source = local_config.load_or_migrate(REPO, CONFIG_PATH, LOCAL_ENV,
+                                                       write=False)
+        existing_cmd = config["ABAQUS_CMD"] if config else None
+        base_cmd = runtime_detection.detect_python()
+        if not base_cmd:
+            raise RuntimeError("External Python 3.11 is required")
+        if args.dry_run:
+            abq_cmd = resolve_abaqus_cmd(interactive=False, existing=existing_cmd)
+            if not abq_cmd:
+                raise RuntimeError("Abaqus command not found; supply a full .bat/.exe path or command name")
+            print("[dry-run] source OK; Python=%s; Abaqus=%s; config source=%s" %
+                  (base_cmd, abq_cmd, source))
+            print("[dry-run] would verify/repair .venv and create mcp_home/ and work/")
+            return 0
 
-    # 2) Python
-    base_cmd = pick_venv_python()
-    if not base_cmd:
-        warn("No suitable system Python found. Install Python 3.11-3.13 (or have py launcher).")
+        ensure_venv(base_cmd)
+        (REPO / "mcp_home").mkdir(exist_ok=True)
+        (REPO / "work").mkdir(exist_ok=True)
+        abq_cmd = resolve_abaqus_cmd(interactive=True, existing=existing_cmd)
+        if not abq_cmd:
+            raise RuntimeError("Abaqus command not found; supply a full .bat/.exe path or command name")
+        if not CONFIG_PATH.exists():
+            write_config(None, abq_cmd)
+        print("[OK] Installed at " + str(REPO))
+        print("[OK] Config: " + str(CONFIG_PATH))
+        print("[OK] Legacy input: " + source + " (left unchanged)")
+        print("Next: doctor.bat, then start_abaqus_agent.bat")
+        return 0
+    except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
+        print("[!!] Installation stopped: " + str(exc))
         return 1
-    ok("Python base interpreter: %s" % " ".join(base_cmd))
-
-    # 3) Abaqus
-    abq_cmd = resolve_abaqus_cmd(interactive=not args.dry_run)
-    if not abq_cmd:
-        warn("Abaqus command not found and none entered.")
-        warn("Re-run install.bat and type the abaqus command/path when asked.")
-        return 1
-    ok("Abaqus command: %s" % abq_cmd)
-
-    # 4) venv
-    if args.dry_run:
-        venv_py = str(REPO / ".venv" / "Scripts" / "python.exe")
-        info("     [dry-run] would create/verify .venv and install mcp<2")
-    else:
-        venv_py = ensure_venv(base_cmd)
-        if not venv_py:
-            warn("Could not create .venv.")
-            return 1
-    ok("Isolated venv ready (no packages into Abaqus Python)")
-
-    # 5) Config
-    if args.dry_run:
-        info("     [dry-run] would write %s" % CONFIG_PATH)
-    else:
-        cfg_path = write_config(venv_py, abq_cmd)
-    ok("Config written")
-
-    # 6) Skill - do NOT blanket-sync to every guessed runtime.
-    runtimes = choose_skill_runtime(skill_runtime_candidates())
-    ambiguous = len(skill_runtime_candidates()) > 1 and len(runtimes) == 0
-    if args.dry_run:
-        if runtimes:
-            for r in runtimes:
-                info("     [dry-run] would sync skill -> %s\\abaqus-agent" % r)
-        else:
-            info("     [dry-run] no single trusted runtime; would write doubao_skill_install.txt")
-    else:
-        if runtimes:
-            for r in runtimes:
-                tgt = sync_skill_to_runtime(r)
-                ok("Skill synced -> %s" % tgt)
-        else:
-            fb = write_fallback_install_text()
-            warn("No single trusted skill runtime detected automatically.")
-            warn("Wrote fallback: %s" % fb)
-            warn("Use the self-install prompt in bootstrap_for_doubao_work.md inside Doubao Work.")
-            if ambiguous:
-                warn("Multiple candidate runtimes found; not overwriting any. Let Doubao Work pick its own runtime.")
-
-    # Summary
-    print()
-    print("=" * 60)
-    ok("abaqus-agent installed")
-    print()
-    print("Next: double-click  start_abaqus_agent.bat")
-    print("      then open Doubao Work and start building.")
-    print("      If anything looks wrong, double-click doctor.bat.")
-    print("=" * 60)
-    return 0
 
 
 if __name__ == "__main__":
