@@ -8,9 +8,10 @@
 
 - `SurfaceToSurfaceContactStd(...)` takes **`main=`** and **`secondary=`**, NOT
   `master=`/`slave=`. The old names raise `TypeError: 关键字错误: master`.
-- Contact pressure/displacement outputs are **per-interaction field keys**:
+- Contact pressure/displacement outputs are **per-contact-pair field keys**:
   `CPRESS   <SECONDARY>/<MAIN>`, `COPEN ...`, `CSHEAR...`. There is no key named
   `CSTRESS`.
+- **Validated on Abaqus/CAE 2026:** a scratch model with `Cont1` and `Cont2` produced two distinct CPRESS and COPEN keys in one frame. Keys used the named surface pairs, not the interaction names. Enumerate keys and select the exact surface pair and region; never take `[0]`.
 - A discrete rigid part must be **meshed** (R3D4) before a `RigidBody` region or a
   contact surface resolves.
 

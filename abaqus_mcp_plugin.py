@@ -17,10 +17,13 @@ import base64
 import io
 import json
 import os
+import re
+import tempfile
 import threading
 import time
 import traceback
 import uuid
+import msvcrt
 from datetime import datetime
 
 __version__ = '4.0.0'
@@ -54,17 +57,27 @@ def _resolve_mcp_home():
 MCP_HOME = _resolve_mcp_home()
 COMMANDS_DIR = os.path.join(MCP_HOME, 'commands')
 RESULTS_DIR = os.path.join(MCP_HOME, 'results')
+CLAIMS_DIR = os.path.join(MCP_HOME, 'claims')
 SCRIPTS_DIR = os.path.join(MCP_HOME, 'scripts')
 SCREENSHOTS_DIR = os.path.join(MCP_HOME, 'screenshots')
 STATUS_FILE = os.path.join(MCP_HOME, 'status.json')
 STOP_FILE = os.path.join(MCP_HOME, 'stop.flag')
 LOG_FILE = os.path.join(MCP_HOME, 'mcp.log')
 
-STALE_COMMAND_AGE = 120.0
+OWNER_LOCK = os.path.join(MCP_HOME, '.owner.lock')
+OWNER_FILE = os.path.join(MCP_HOME, 'owner.json')
+_owner_handle = None
+_session_id = None
+_COMMAND_ID = re.compile(r'[0-9a-f]{32}\Z')
+_COMMAND_FILE = re.compile(r'cmd_([0-9a-f]{32})\.json\Z')
+
+
+def _valid_command_id(value):
+    return isinstance(value, str) and _COMMAND_ID.fullmatch(value) is not None
 
 
 def ensure_dirs():
-    for d in [COMMANDS_DIR, RESULTS_DIR, SCRIPTS_DIR, SCREENSHOTS_DIR]:
+    for d in [COMMANDS_DIR, CLAIMS_DIR, RESULTS_DIR, SCRIPTS_DIR, SCREENSHOTS_DIR]:
         if not os.path.exists(d):
             os.makedirs(d)
 
@@ -90,30 +103,34 @@ def write_status(status, message=""):
         "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "pid": os.getpid(),
         "mcp_home": MCP_HOME,
+        "session_id": _session_id,
     }
-    tmp_file = STATUS_FILE + '.tmp'
-    try:
-        with io.open(tmp_file, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, indent=2)
-        for _ in range(5):
-            try:
-                os.replace(tmp_file, STATUS_FILE)
-                return
-            except Exception:
-                time.sleep(0.02)
-        with io.open(STATUS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, indent=2)
+    for _ in range(5):
         try:
-            os.remove(tmp_file)
-        except Exception:
-            pass
-    except Exception:
-        pass
+            _write_json(STATUS_FILE, payload)
+            return
+        except OSError:
+            time.sleep(0.02)
+    _log('ERROR', 'Could not publish status atomically')
 
 
 def _write_json(path, data):
-    with io.open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    """Atomically publish command or result JSON in its destination directory."""
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                                         dir=os.path.dirname(path), prefix='.tmp-ipc-',
+                                         delete=False) as f:
+            temp_path = f.name
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None:
+            try:
+                os.remove(temp_path)
+            except FileNotFoundError:
+                pass
 
 
 def _background_self_test(timeout=1.5):
@@ -121,7 +138,9 @@ def _background_self_test(timeout=1.5):
     Verify background worker can consume command files and write result files.
     Returns True if ping loopback succeeds.
     """
-    test_id = 'bgtest_' + uuid.uuid4().hex[:8]
+    test_id = uuid.uuid4().hex
+    if not _valid_command_id(test_id):
+        return False
     cmd_path = os.path.join(COMMANDS_DIR, 'cmd_' + test_id + '.json')
     result_path = os.path.join(RESULTS_DIR, test_id + '.json')
     command = {
@@ -164,23 +183,56 @@ def _background_self_test(timeout=1.5):
     return False
 
 
-def _cleanup_stale_commands():
-    """Remove command files older than STALE_COMMAND_AGE seconds."""
-    now = time.time()
+def _acquire_owner():
+    global _owner_handle, _session_id
+    if _owner_handle is not None:
+        return True
+    ensure_dirs()
+    handle = open(OWNER_LOCK, 'a+b')
     try:
-        for name in os.listdir(COMMANDS_DIR):
-            if not name.endswith('.json'):
-                continue
-            fpath = os.path.join(COMMANDS_DIR, name)
-            try:
-                age = now - os.path.getmtime(fpath)
-                if age > STALE_COMMAND_AGE:
-                    os.remove(fpath)
-                    _log('WARN', 'Removed stale command: ' + name)
-            except Exception:
-                pass
+        handle.seek(0)
+        handle.write(b'0')
+        handle.flush()
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError:
+        handle.close()
+        return False
+    _owner_handle = handle
+    _session_id = uuid.uuid4().hex
+    try:
+        _write_json(OWNER_FILE, {'session_id': _session_id, 'pid': os.getpid(),
+                                 'timestamp': time.time()})
     except Exception:
-        pass
+        _release_owner()
+        raise
+    return True
+
+
+def _release_owner():
+    global _owner_handle, _session_id
+    if _owner_handle is None:
+        return
+    try:
+        handle = _owner_handle
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        handle.close()
+    finally:
+        _owner_handle = None
+        _session_id = None
+
+
+def _stop_requested():
+    try:
+        with io.open(STOP_FILE, 'r', encoding='utf-8') as f:
+            request = json.load(f)
+        if request.get('session_id') != _session_id:
+            return False
+        os.remove(STOP_FILE)
+        return True
+    except (OSError, ValueError, AttributeError):
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +247,9 @@ def execute_script(script_content, script_id):
         "error": None,
         "timestamp": time.time(),
     }
+    if not _valid_command_id(script_id):
+        result['error'] = 'Invalid command ID'
+        return result
     script_path = os.path.join(SCRIPTS_DIR, 'script_' + script_id + '.py')
     try:
         with io.open(script_path, 'w', encoding='utf-8') as f:
@@ -325,21 +380,25 @@ def get_odb_info(odb_path):
     return info
 
 
-def get_viewport_image(viewport_name=None, width=800, height=600, fmt='PNG'):
+def get_viewport_image(viewport_name=None, width=800, height=600, fmt='PNG', command_id=None):
     """Capture a viewport image and return it as base64."""
     try:
         from abaqus import session
         from abaqusConstants import PNG, SVG, TIFF
         _fmt_map = {'PNG': PNG, 'SVG': SVG, 'TIFF': TIFF}
+        fmt = str(fmt).upper()
+        if fmt not in _fmt_map:
+            return {'success': False, 'error': 'Unsupported image format: ' + fmt}
         vp_name = viewport_name or session.currentViewportName
         if vp_name not in session.viewports:
             return {'success': False, 'error': 'Viewport not found: ' + str(vp_name)}
 
         # printToFile appends its OWN extension; give it an extensionless basename.
-        img_base = os.path.join(SCREENSHOTS_DIR, 'viewport_' + str(int(time.time())))
+        img_base = os.path.join(SCREENSHOTS_DIR, 'viewport_' +
+                                (command_id if _valid_command_id(command_id) else uuid.uuid4().hex))
         session.printToFile(
             fileName=img_base,
-            format=_fmt_map.get(fmt.upper(), PNG),
+            format=_fmt_map[fmt],
             canvasObjects=(session.viewports[vp_name],)
         )
         # Discover the real on-disk file (printToFile may use .png/.svg/.tif).
@@ -347,9 +406,8 @@ def get_viewport_image(viewport_name=None, width=800, height=600, fmt='PNG'):
         # Do NOT fall back to arbitrary older viewport_* screenshots — that would
         # return a stale image from a previous capture.
         ext_map = {'PNG': '.png', 'SVG': '.svg', 'TIFF': '.tif'}
-        expected_ext = ext_map.get(fmt.upper(), '.png')
-        candidate = img_base + expected_ext
-        found = candidate if os.path.exists(candidate) else None
+        extensions = ('.tif', '.tiff') if fmt == 'TIFF' else (ext_map[fmt],)
+        found = next((img_base + ext for ext in extensions if os.path.exists(img_base + ext)), None)
         if found and os.path.exists(found):
             with open(found, 'rb') as f:
                 data = base64.b64encode(f.read()).decode('ascii')
@@ -357,7 +415,10 @@ def get_viewport_image(viewport_name=None, width=800, height=600, fmt='PNG'):
                 os.remove(found)
             except Exception:
                 pass
-            return {'success': True, 'image_base64': data, 'format': fmt.lower()}
+            return {'success': True, 'image_base64': data, 'format': fmt.lower(),
+                    'extension': os.path.splitext(found)[1],
+                    'mime_type': {'PNG': 'image/png', 'SVG': 'image/svg+xml',
+                                  'TIFF': 'image/tiff'}[fmt]}
         return {'success': False, 'error': 'Image file not created'}
     except Exception as e:
         return {'success': False, 'error': str(e)}
@@ -396,6 +457,7 @@ def process_command(command):
                 width=command.get('width', 800),
                 height=command.get('height', 600),
                 fmt=command.get('format', 'PNG'),
+                command_id=cmd_id,
             )
             result['success'] = data.get('success', False)
             result['data'] = data
@@ -404,12 +466,14 @@ def process_command(command):
             result['data'] = 'Log not available'
         elif cmd_type == 'ping':
             result['success'] = True
-            result['data'] = {'response': 'pong', 'version': __version__}
+            result['data'] = {'response': 'pong', 'version': __version__, 'session_id': _session_id}
         elif cmd_type == 'stop':
-            result['success'] = True
-            result['data'] = 'stopping'
-            with io.open(STOP_FILE, 'w', encoding='utf-8') as f:
-                f.write('stop')
+            if command.get('session_id') != _session_id or _session_id is None:
+                result['error'] = 'Stop request session does not own this bridge'
+            else:
+                result['success'] = True
+                result['data'] = 'stopping'
+                _write_json(STOP_FILE, {'session_id': _session_id})
         else:
             result['error'] = 'Unknown command: ' + cmd_type
     except Exception as e:
@@ -457,31 +521,37 @@ def poll_once():
         _mcp_last_status_time = now
 
     try:
-        cmd_files = [name for name in os.listdir(COMMANDS_DIR) if name.endswith('.json')]
+        cmd_files = [name for name in os.listdir(COMMANDS_DIR)
+                     if _COMMAND_FILE.fullmatch(name)]
         if not cmd_files:
             return False
 
-        cmd_files.sort()
+        cmd_files.sort()  # deterministic scan; no cross-publisher FIFO guarantee
         cmd_file = cmd_files[0]
+        cmd_id = _COMMAND_FILE.fullmatch(cmd_file).group(1)
         cmd_path = os.path.join(COMMANDS_DIR, cmd_file)
-
-        command = _load_command_file(cmd_path)
-        if command is None:
-            return False
-
-        cmd_id = command.get('id', 'unknown')
-        cmd_type = command.get('type', 'unknown')
-
+        claim_path = os.path.join(CLAIMS_DIR, cmd_file)
         try:
-            os.remove(cmd_path)
-        except Exception:
-            pass
+            os.rename(cmd_path, claim_path)  # Windows rename refuses an existing claim
+        except OSError:
+            return False  # cancelled or claimed elsewhere
 
-        result = process_command(command)
+        command = _load_command_file(claim_path)
+        valid = (isinstance(command, dict) and command.get('id') == cmd_id
+                 and isinstance(command.get('type'), str) and bool(command['type'])
+                 and isinstance(command.get('timestamp'), (int, float)))
+        if not valid:
+            result = {'id': cmd_id, 'success': False, 'timestamp': time.time(),
+                      'error': 'Protocol error: malformed command envelope'}
+            cmd_type = 'protocol_error'
+        else:
+            cmd_type = command['type']
+            result = process_command(command)
         _mcp_commands_processed += 1
 
         result_path = os.path.join(RESULTS_DIR, cmd_id + '.json')
         _write_json(result_path, result)
+        os.remove(claim_path)
 
         if cmd_type != 'ping':
             status = 'OK' if result.get('success') else 'FAIL'
@@ -526,7 +596,6 @@ def _mcp_thread_loop(generation, poll_interval):
     """Background polling loop used by non-blocking start modes."""
     global _mcp_running, _mcp_thread, _mcp_generation
     last_status_time = 0.0
-    cleanup_time = 0.0
 
     try:
         while _mcp_running and _mcp_generation == generation:
@@ -536,15 +605,7 @@ def _mcp_thread_loop(generation, poll_interval):
                 write_status('running', 'Polling active (background) | cmds=%d uptime=%ds' % (_mcp_commands_processed, uptime))
                 last_status_time = now
 
-            if now - cleanup_time >= 30.0:
-                _cleanup_stale_commands()
-                cleanup_time = now
-
-            if os.path.exists(STOP_FILE):
-                try:
-                    os.remove(STOP_FILE)
-                except Exception:
-                    pass
+            if _stop_requested():
                 _mcp_running = False
                 print('MCP: Stopped by stop.flag')
                 _log('INFO', 'Stopped by stop.flag')
@@ -569,6 +630,7 @@ def _mcp_thread_loop(generation, poll_interval):
             write_status('stopped', 'Polling stopped')
             print('MCP: Background loop ended')
             _log('INFO', 'Background loop ended')
+            _release_owner()
 
 
 def _start_worker(interval=0.1, mode_name='background'):
@@ -578,10 +640,13 @@ def _start_worker(interval=0.1, mode_name='background'):
     if _thread_is_alive(_mcp_thread):
         print('MCP: Already running')
         return True
+    if not _acquire_owner():
+        print('MCP: BUSY: another consumer owns this MCP_HOME')
+        return False
 
     if _mcp_running:
-        print('MCP: Recovering from stale running state')
-        _mcp_running = False
+        print('MCP: Already running in this process')
+        return False
 
     if os.path.exists(STOP_FILE):
         try:
@@ -668,15 +733,15 @@ def mcp_start_timer(interval=0.1):
 def mcp_stop():
     """Stop mcp_loop() or mcp_start()."""
     global _mcp_running, _mcp_thread, _mcp_generation
+    if _owner_handle is None:
+        print('MCP: No active session owned by this process')
+        return False
 
     _mcp_running = False
     _mcp_generation += 1
 
-    try:
-        with io.open(STOP_FILE, 'w', encoding='utf-8') as f:
-            f.write('stop')
-    except Exception:
-        pass
+    if _session_id:
+        _write_json(STOP_FILE, {'session_id': _session_id})
 
     if _thread_is_alive(_mcp_thread):
         try:
@@ -693,6 +758,12 @@ def mcp_stop():
 def mcp_loop(sleep_interval=0.1):
     """Blocking loop that continuously processes MCP commands."""
     global _mcp_running, _mcp_commands_processed, _mcp_start_time
+    if _mcp_running:
+        print('MCP: Already running in this process')
+        return False
+    if not _acquire_owner():
+        print('MCP: BUSY: another consumer owns this MCP_HOME')
+        return False
     if os.path.exists(STOP_FILE):
         try:
             os.remove(STOP_FILE)
@@ -711,7 +782,6 @@ def mcp_loop(sleep_interval=0.1):
     write_status('running', 'Polling active (blocking)')
     _log('INFO', 'Started in blocking mode')
     last_status_time = 0.0
-    cleanup_time = 0.0
 
     try:
         while True:
@@ -720,15 +790,7 @@ def mcp_loop(sleep_interval=0.1):
                 write_status('running', 'Polling active (blocking)')
                 last_status_time = now
 
-            if now - cleanup_time >= 30.0:
-                _cleanup_stale_commands()
-                cleanup_time = now
-
-            if os.path.exists(STOP_FILE):
-                try:
-                    os.remove(STOP_FILE)
-                except Exception:
-                    pass
+            if _stop_requested():
                 print('MCP: Stopped by stop.flag')
                 break
 
@@ -741,6 +803,8 @@ def mcp_loop(sleep_interval=0.1):
         _log('ERROR', 'mcp_loop: ' + str(e))
 
     write_status('stopped', 'Polling stopped')
+    _mcp_running = False
+    _release_owner()
     print('MCP: Loop ended')
     _log('INFO', 'Blocking loop ended')
 
@@ -748,6 +812,12 @@ def mcp_loop(sleep_interval=0.1):
 def mcp_coop_loop(sleep_interval=0.1):
     """Cooperative loop: runs in current thread but yields GUI updates."""
     global _mcp_running, _mcp_commands_processed, _mcp_start_time
+    if _mcp_running:
+        print('MCP: Already running in this process')
+        return False
+    if not _acquire_owner():
+        print('MCP: BUSY: another consumer owns this MCP_HOME')
+        return False
     if os.path.exists(STOP_FILE):
         try:
             os.remove(STOP_FILE)
@@ -763,7 +833,6 @@ def mcp_coop_loop(sleep_interval=0.1):
     write_status('running', 'Polling active (cooperative)')
     _log('INFO', 'Started in cooperative mode')
     last_status_time = 0.0
-    cleanup_time = 0.0
 
     try:
         while True:
@@ -772,15 +841,7 @@ def mcp_coop_loop(sleep_interval=0.1):
                 write_status('running', 'Polling active (cooperative)')
                 last_status_time = now
 
-            if now - cleanup_time >= 30.0:
-                _cleanup_stale_commands()
-                cleanup_time = now
-
-            if os.path.exists(STOP_FILE):
-                try:
-                    os.remove(STOP_FILE)
-                except Exception:
-                    pass
+            if _stop_requested():
                 print('MCP: Stopped by stop.flag')
                 break
 
@@ -800,6 +861,8 @@ def mcp_coop_loop(sleep_interval=0.1):
         _log('ERROR', 'mcp_coop_loop: ' + str(e))
 
     write_status('stopped', 'Polling stopped')
+    _mcp_running = False
+    _release_owner()
     print('MCP: Cooperative loop ended')
     _log('INFO', 'Cooperative loop ended')
 
@@ -835,7 +898,6 @@ def mcp_status():
 # ---------------------------------------------------------------------------
 
 ensure_dirs()
-write_status('ready', 'Plugin loaded v' + __version__)
 
 print('')
 print('=' * 55)

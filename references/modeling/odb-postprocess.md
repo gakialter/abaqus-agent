@@ -1,6 +1,6 @@
 # ODB post-processing (in the live kernel)
 
-> Status: extraction of U / RF / S / PEEQ / CPRESS confirmed on Abaqus 2026.
+> Status: **Validated on Abaqus/CAE 2026** for extraction of U / RF / S / PEEQ / CPRESS in the cited micro-tests. In an EPP run requesting both E and LE, the ODB contained LE and PEEQ but no E field. Inspect actual field keys before extraction.
 
 Run this **inside the kernel** via `execute_script` (the kernel already opened the job;
 you can also `openOdb` read-only). Open `readOnly=True` whenever you only read.
@@ -65,7 +65,10 @@ If `nodeSets['FIXED']` is missing at assembly level, try
 ## Contact pressure
 
 ```python
-cp_key = [k for k in fr.fieldOutputs if k.startswith('CPRESS')][0]
+cp_keys = [k for k in fr.fieldOutputs if k.startswith('CPRESS')]
+# Inspect cp_keys and choose the exact named surface pair and region required by the task.
+cp_key = 'CPRESS   ASSEMBLY_CUBEBOTTOM2/ASSEMBLY_PLATENTOP2'  # example from two-contact scratch test
+assert cp_key in cp_keys
 cp = fr.fieldOutputs[cp_key]
 max_cpress = max(abs(v.data) for v in cp.values)
 n_on = sum(1 for v in cp.values if abs(v.data) > 1e-6)

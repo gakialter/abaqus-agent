@@ -1,6 +1,6 @@
 # Execution Workflow — how the agent drives a real Abaqus task
 
-> Status: **Validated on Abaqus 2026** (live kernel, file-IPC bridge v4.0.0).
+> Bridge: **Validated on Abaqus/CAE 2026**. Individual recipes below carry their own evidence status; review version-sensitive calls before reuse.
 > This is OUR runbook. It adapts the upstream playbook loop to the MCP architecture —
 > it does **not** use `abaqus cae noGUI=` as the primary path.
 
@@ -32,48 +32,48 @@ Each phase ends at a gate. A failed gate stops the loop; do not pass through it 
 
 ```
 PHASE 1 PROBLEM FIDELITY
-   read the original statement (PDF/DOCX/image/参数表). List facts and unknowns.
-   GATE 1 Problem Fidelity (lessons-learned Case 1): nodes/parts, topology, dims,
+   read the original statement (PDF/DOCX/image/参数表). List FACTS, UNKNOWNS, AMBIGUITIES, and MODEL INFERENCES.
+   G1 Problem Fidelity (lessons-learned Case 1): nodes/parts, topology, dims,
      material, load location, load direction, supports, contacts, objective all
      transcribed from the statement. Missing/illegible -> STOP and ask. No guessing.
 PHASE 2 MODEL PLAN
    dimensionality (3D vs axisymmetry when truly axisymmetric), element, material,
    BC, load, contact, expected outputs.
-   GATE 2 Requirement Compliance (Case 4): every observable the statement asks for
+   G2 Requirement Compliance (Case 4): every observable the statement asks for
      (CPRESS, punch RP RF, specific component, opening ...) maps to a real entity in
      this plan. No "equivalent BC" standing in for a requested contact/RP result.
 PHASE 3 PREFLIGHT
    units (N-mm-MPa), geometry, topology, output requests, job path, scratch chdir.
-   GATE 3a Pre-run Output (Case 6): each required observable has an ODB output path
+   G3 Pre-run Output (Case 6): each required observable has an ODB output path
      (S/U/RF/PEEQ/CPRESS/COPEN/HistoryOutput) in the FieldOutput/HistoryOutput request.
      A required-but-unrequested quantity -> add it now, do not start the run.
-   GATE 3b Suspicious input (Case: keep E=21000 as written): a parameter that "looks
+   G1 input check Suspicious input (Case: keep E=21000 as written): a parameter that "looks
      wrong" vs common knowledge is NOT permission to edit it. Mark the doubt, use the
      stated value, offer an alternate rerun.
 PHASE 4 RUN
    build via one execute_script (delete same-named model first); submit_job with a
    generous timeout; if ABORTED read .sta/.msg/.dat/.log -> error-diagnosis.md, apply
    the MINIMAL fix, re-run (max ~3 attempts, then report honestly).
-   GATE 4 Solver completion: status == COMPLETED. This alone is NOT success.
+   G4 Solver completion: status == COMPLETED. This alone is NOT success.
 PHASE 5 RESULT EXTRACTION
    read ODB in-kernel (odb-postprocess.md), compute Mises from S, pull field + history.
-   GATE 5 Result Interpretation (Cases 2/3/7): for every reported extrema record
+   G5 Result Interpretation (Cases 2/3/7): for every reported extrema record
      location, region, proximity to a constraint/contact edge, singularity plausibility,
      and a representative mean/path value with its averaging definition.
 PHASE 6 VERIFICATION
    smallest sufficient check (verification.md): RF balance, analytical/sanity check,
      interference compatibility, trends, mesh sensitivity when needed.
-   GATE 6 Verification (Cases 2/7): same Job/frame/quantity/region/units/BC/assumptions;
+   G6 Verification (Cases 2/7): same Job/frame/quantity/region/units/BC/assumptions;
      no back-fitting; benchmark applicable to this FE model; press force kept distinct
      from CPRESS.
 PHASE 7 REPORTING
    model summary, key results, verification numbers, warnings, files.
-   GATE 7 Report Consistency (Case 5): numbers/units/signs/radius-vs-diameter/
+   G7 Report Consistency (Case 5): numbers/units/signs/radius-vs-diameter/
      engineering-vs-true strain/direction checked against model variables and formulas.
 PHASE 8 COMPLETION GATE
-   only when GATES 1..7 all pass may you write
+   G8 Completion: only when G1..G7 all pass may you write
      "analysis completed and validated".
-   If the solver merely returned COMPLETED, write "solver completed" and list the
+   COMPLETED is not task complete. If the solver merely returned COMPLETED, write "solver completed" and list the
    gates that did NOT pass.
 ```
 
@@ -94,7 +94,7 @@ This repo does **not** adopt the upstream "default Q235 / default 100 mm block /
 > Counter-example we must never repeat: a 4-node truss problem was once silently rebuilt
 > as a 6-node, 9-bar model. That is wrong. The topology in the problem statement is fixed.
 
-## Units: N-mm-MPa only
+## Units: N-mm-MPa preferred consistent system
 
 | Quantity | Value for steel | Common mistake |
 |----------|-----------------|----------------|
@@ -119,7 +119,7 @@ This repo does **not** adopt the upstream "default Q235 / default 100 mm block /
 - Model/job name collisions error out; delete before recreating.
 - `printToFile(fileName=...)` wants an extensionless base name + `from abaqusConstants import PNG`.
 
-## Required-observable → ODB key quick map (GATE 3a)
+## Required-observable → ODB key quick map (G3)
 
 | Statement asks for | Must request in the job |
 |--------------------|--------------------------|

@@ -16,7 +16,7 @@
 m.StaticStep(name='S1', previous='Initial', timePeriod=1.0, nlgeom=ON,
              initialInc=0.05, minInc=1e-8, maxInc=0.1, maxNumInc=1000)
 m.FieldOutputRequest(name='F1', createStepName='S1',
-                     variables=('S','E','PEEQ','U','RF'), frequency=5)
+                     variables=('S','LE','PEEQ','U','RF'), frequency=5)
 ```
 
 ## Displacement control (preferred for forming / compression)

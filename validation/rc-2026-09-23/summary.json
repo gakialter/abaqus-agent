@@ -1,0 +1,35 @@
+{
+  "source_archive_head": "45fd773",
+  "clean_zip_install_exit": 0,
+  "installed_repo": "C:\\Users\\27296\\AppData\\Local\\Temp\\abaqus-rc-clean-20260923\\extracted",
+  "python": "3.11.9",
+  "mcp": "1.30.0",
+  "FastMCP_import": true,
+  "doctor_before_start": {
+    "INSTALLED": true,
+    "BRIDGE_READY": false,
+    "INTEGRATION_READY": "EXTERNAL/UNVERIFIED"
+  },
+  "lock_probe": {
+    "mechanism": "msvcrt.locking",
+    "path_contains_spaces_and_Chinese": true,
+    "A_acquired": true,
+    "B_failed": true,
+    "A_killed_then_C_acquired": true
+  },
+  "owner_recovery": {
+    "old_session": "03b1dc9840374085b0cd9ffd5aef5151",
+    "new_session": "b2e660ffcd214f7bba5ef4bec1f83282",
+    "bridge_ready_after_restart": true
+  },
+  "normal_cae_plus_launcher_cae": {
+    "observed_two_CAE_windows": true,
+    "owner_ping_session_unchanged": true
+  },
+  "screenshot_dimensions": "not validated; width and height are not promised",
+  "two_named_contact_interactions": "PASS: Cont1 and Cont2 in one completed ODB; two CPRESS and two COPEN surface-pair keys; selected second exact key",
+  "doubao_work": "UNVERIFIED; no configuration written",
+  "epp_output": "LE and PEEQ present; E absent despite request",
+  "screenshot_formats": "PNG .png image/png, SVG .svg image/svg+xml, TIFF .tif image/tiff; TIF and JPEG rejected",
+  "final_clean_zip_install": "PASS from aa3dbd5, path includes Chinese, spaces and ampersand; Python 3.11.9, mcp 1.30.0, FastMCP; doctor INSTALLED=true before start and BRIDGE_READY=true after real ping"
+}

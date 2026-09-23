@@ -1,0 +1,27 @@
+{
+  "build": {
+    "id": "1a855094c003418d96739a6315491365",
+    "success": true,
+    "output": "{\"built\": true, \"nelem\": 125}",
+    "error": null,
+    "timestamp": 1790153604.085852
+  },
+  "job": {
+    "id": "cd48a11c645040a2ba6ab62b7ec31015",
+    "success": true,
+    "timestamp": 1790153604.22615,
+    "data": {
+      "success": true,
+      "job": "ContactJob",
+      "status": "COMPLETED",
+      "error": null
+    }
+  },
+  "fields": {
+    "id": "8db0d9d575cd497b839c33eff5ba4edc",
+    "success": true,
+    "output": "{'fields': ['COPEN    ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'CPRESS   ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'CSHEAR1  ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'CSHEAR2  ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'CSLIP1   ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'CSLIP2   ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'LE', 'RF', 'RM', 'S', 'U', 'UR'], 'cp_keys': ['CPRESS   ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP'], 'co_keys': ['COPEN    ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP'], 'exact_cont1': [], 'RF_distinct': True}",
+    "error": null,
+    "timestamp": 1790153626.1473382
+  }
+}

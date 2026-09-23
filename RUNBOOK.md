@@ -1,3 +1,5 @@
+> Historical/local reproduction, non-portable paths and observations. Use README.md for current installation.
+
 # Abaqus 2026 × AI Agent 集成运行手册
 
 最终方案：**Cai-aa/abaqus-mcp v4.0（文件 IPC）+ 独立 venv**，已在 Abaqus/CAE 2026 (Python 3.10) 上端到端跑通。

@@ -90,8 +90,8 @@ With `nlgeom=ON` and large strain, use the **current** (deformed) area, not the 
 area. **Caveat learned the hard way:** if the specimen ends are encastred / friction-
 locked, it barrels and the ends are triaxially stressed, so `sy*A` is only an
 **order-of-magnitude** check — NOT a tight benchmark. The tight check is then the
-**field-mean PEEQ vs the theoretical plastic strain**, not the force. In our 5% EPP
-cube, `mean PEEQ = 0.0506` matched theory `ln(9.5/10) - sy/E = 0.0501` to ~1.1%, while
+**unweighted arithmetic field-value mean PEEQ vs the approximate theoretical plastic strain**, not the force. In our 5% EPP
+cube, the unweighted mean `PEEQ = 0.05064` was near the estimate `ln(10/9.5) - sy/E ≈ 0.0501`; this is not a proven volume average or exact benchmark, while
 `max PEEQ = 0.100` at the constrained corner must not be quoted as the global strain,
 and `sy*A` carried a ~10% gap from end triaxiality (explain it, do not "fix" it with a
 back-fit — never manufacture a "theoretical" force that lands near the measured RF).
@@ -129,5 +129,7 @@ order of magnitude the hand calc predicts.
 
 ## Report the check, not just the result
 
-Always state: what you compared, the FE number, the expected number, and the % difference.
+State the quantity, region and meaning of each check. Give percentage difference only for comparable numerical quantities where it is meaningful.
+
+Verification types: EXACT_ANALYTICAL_BENCHMARK, APPROX_ANALYTICAL_ESTIMATE, SANITY_CHECK, EQUILIBRIUM_CHECK, COMPATIBILITY_CHECK, TREND_CHECK, MESH_CHECK.
 If you could not run a check, say so and why — never imply a verified result that was not.

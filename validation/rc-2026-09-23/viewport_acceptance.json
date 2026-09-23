@@ -1,0 +1,17 @@
+{
+  "set_view": {
+    "id": "6dda24c7e1bd4a2a823decea3fda8b30",
+    "success": true,
+    "output": "VIEW_READY",
+    "error": null,
+    "timestamp": 1790153784.6031651
+  },
+  "capture": {
+    "success": true,
+    "format": "png",
+    "extension": ".png",
+    "mime_type": "image/png"
+  },
+  "bytes": 36645,
+  "path": "C:\\Users\\27296\\AppData\\Local\\Temp\\abaqus-rc-clean-20260923\\contact_viewport.png"
+}

@@ -1,0 +1,35 @@
+{
+  "build": {
+    "id": "d8942c04aead41cbb15d97fb1bc9aa23",
+    "success": true,
+    "output": "{\"built\": true, \"nelem\": 125}",
+    "error": null,
+    "timestamp": 1790156822.7391484
+  },
+  "job": {
+    "id": "c1aab201b226441091d28f1d9bf8c462",
+    "success": true,
+    "timestamp": 1790156823.064706,
+    "data": {
+      "success": true,
+      "job": "ContactTwoJob",
+      "status": "COMPLETED",
+      "error": null
+    }
+  },
+  "fields": {
+    "id": "06c352353c20435182d0265b2100f0d7",
+    "success": false,
+    "output": "",
+    "error": "'abaqus.Repository' object is not iterable",
+    "timestamp": 1790156847.5520885,
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\27296\\AppData\\Local\\Temp\\abaqus-rc-clean-20260923\\extracted\\abaqus_mcp_plugin.py\", line 285, in execute_script\n    exec(compile(f.read(), script_path, 'exec'), exec_globals)\n  File \"C:\\Users\\27296\\AppData\\Local\\Temp\\abaqus-rc-clean-20260923\\extracted\\mcp_home\\scripts\\script_06c352353c20435182d0265b2100f0d7.py\", line 1, in <module>\n    from odbAccess import openOdb; o=openOdb(r'C:\\Users\\27296\\AppData\\Local\\Temp\\abaqus-rc-clean-20260923\\extracted\\work\\ContactTwoJob.odb',readOnly=True); f=o.steps['S1'].frames[-1]; cp=[k for k in f.fieldOutputs if k.startswith('CPRESS')]; co=[k for k in f.fieldOutputs if k.startswith('COPEN')]; print({'cp_keys':cp,'co_keys':co,'selected_second':next((k for k in cp if 'CUBEBOTTOM2/ASSEMBLY_PLATENTOP2' in k),None),'rf_separate':'RF' in f.fieldOutputs}); o.close()\nTypeError: 'abaqus.Repository' object is not iterable\n"
+  },
+  "fields_corrected": {
+    "id": "e0ad874fdf8d4113830a536d8d16637c",
+    "success": true,
+    "output": "{'cp_keys': ['CPRESS   ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'CPRESS   ASSEMBLY_CUBEBOTTOM2/ASSEMBLY_PLATENTOP2'], 'co_keys': ['COPEN    ASSEMBLY_CUBEBOTTOM/ASSEMBLY_PLATENTOP', 'COPEN    ASSEMBLY_CUBEBOTTOM2/ASSEMBLY_PLATENTOP2'], 'selected_second': 'CPRESS   ASSEMBLY_CUBEBOTTOM2/ASSEMBLY_PLATENTOP2', 'second_values': 157, 'rf_separate': True}",
+    "error": null,
+    "timestamp": 1790156864.4911377
+  }
+}
