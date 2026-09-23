@@ -1,0 +1,22 @@
+{
+  "3.11": [
+    "PROJECT_TESTED_PASS",
+    "venv/import/FastMCP/STDIO discovery; mcp=1.30.0"
+  ],
+  "3.10": [
+    "NOT_AVAILABLE",
+    "No suitable Python runtime found\nPass --list (-0) to see all detected environments on your machine\nor set environment variable PYLAUNCHER_ALLOW_INSTALL to use winget\nor open the Microsoft Store to the requested version."
+  ],
+  "3.12": [
+    "NOT_AVAILABLE",
+    "No suitable Python runtime found\nPass --list (-0) to see all detected environments on your machine\nor set environment variable PYLAUNCHER_ALLOW_INSTALL to use winget\nor open the Microsoft Store to the requested version."
+  ],
+  "3.13": [
+    "NOT_AVAILABLE",
+    "No suitable Python runtime found\nPass --list (-0) to see all detected environments on your machine\nor set environment variable PYLAUNCHER_ALLOW_INSTALL to use winget\nor open the Microsoft Store to the requested version."
+  ],
+  "3.14": [
+    "PROJECT_TESTED_PASS",
+    "venv/import/FastMCP/STDIO discovery; mcp=1.30.0"
+  ]
+}
