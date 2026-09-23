@@ -11,6 +11,8 @@
 
 ## Isotropic elastic (+optional density)
 
+`Density(table=((7.85e-9,),))` was **Validated on Abaqus/CAE 2026** in a scratch model. The other material recipes below retain their stated evidence labels.
+
 ```python
 m.Material(name='Steel')
 m.materials['Steel'].Elastic(table=((210000.0, 0.3),))

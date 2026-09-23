@@ -27,6 +27,17 @@ def load_server(name, home):
 
 
 class IPC(unittest.TestCase):
+    def test_queued_timeout_cancels_before_claim_for_both_senders(self):
+        for label in ('client', 'server'):
+            with self.subTest(sender=label), temp_home() as home:
+                sender = load('cancel_' + label, 'client.py', home) if label == 'client' else load_server('cancel_server', home)
+                result = (sender.send if label == 'client' else sender._send_command)('ping', timeout=0)
+                self.assertFalse(result['success'])
+                self.assertEqual(result['execution_state'], 'CANCELLED_BEFORE_CLAIM')
+                self.assertEqual(len(result['command_id']), 32)
+                self.assertEqual(list((home / 'commands').glob('cmd_*.json')), [])
+                self.assertEqual(list((home / 'claims').glob('cmd_*.json')), [])
+
     def test_L3_filenames_use_generated_command_id(self):
         with temp_home() as home:
             client = load("d6_client_ok", "client.py", home)
@@ -342,6 +353,9 @@ class Plugin(unittest.TestCase):
         with temp_home() as home:
             plugin = load("d6_plugin_stop", "abaqus_mcp_plugin.py", home)
             self.assertTrue(plugin._acquire_owner())
+            rejected = plugin.process_command({"id": "y", "type": "stop", "session_id": "f" * 32})
+            self.assertFalse(rejected['success'])
+            self.assertFalse((home / 'stop.flag').exists())
             result = plugin.process_command({"id": "x", "type": "stop", "session_id": plugin._session_id})
             self.assertTrue(result["success"])
             self.assertEqual(json.loads((home / "stop.flag").read_text())["session_id"], plugin._session_id)

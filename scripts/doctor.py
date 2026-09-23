@@ -11,13 +11,18 @@ import runtime_detection
 REPO = Path(__file__).resolve().parent.parent
 
 
+def check_venv_py():
+    path = REPO / '.venv' / 'Scripts' / 'python.exe'
+    return path if path.is_file() else None
+
+
 def main():
     faults = []
     missing = bootstrap_windows.verify_repo_files()
     if missing:
         faults.append('missing source: ' + ', '.join(missing))
-    venv = REPO / '.venv'
-    if not bootstrap_windows.venv_is_ready(venv):
+    venv_py = check_venv_py()
+    if venv_py is None or not bootstrap_windows.venv_is_ready(venv_py.parents[1]):
         faults.append('venv requires Python 3.11, mcp==1.30.0 and FastMCP')
     try:
         cfg, source = local_config.load_or_migrate(REPO, write=False)

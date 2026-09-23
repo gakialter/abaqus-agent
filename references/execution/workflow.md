@@ -1,6 +1,6 @@
 # Execution Workflow — how the agent drives a real Abaqus task
 
-> Status: **Validated on Abaqus 2026** (live kernel, file-IPC bridge v4.0.0).
+> Bridge: **Validated on Abaqus/CAE 2026**. Individual recipes below carry their own evidence status; review version-sensitive calls before reuse.
 > This is OUR runbook. It adapts the upstream playbook loop to the MCP architecture —
 > it does **not** use `abaqus cae noGUI=` as the primary path.
 

@@ -18,9 +18,9 @@ set "RC=%ERRORLEVEL%"
 
 echo.
 if "%RC%"=="0" (
-  echo Overall: READY - you can use abaqus-agent in Doubao Work.
+  echo Bridge ready. MCP host integration must be verified separately.
 ) else (
-  echo Overall: NOT READY - follow the fix hints above, then re-run.
+  echo Review INSTALLED and BRIDGE_READY above. Integration is external.
 )
 echo.
 pause

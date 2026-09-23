@@ -89,7 +89,7 @@ def _send_command(cmd_type: str, timeout: float = TIMEOUT, **kwargs) -> dict:
     else:
         cancelled.unlink(missing_ok=True)
         state = 'CANCELLED_BEFORE_CLAIM'
-    return {'success': False, 'error': f'Timeout: no response from Abaqus in {timeout}s',
+    return {'success': False, 'error': f'Timeout after {timeout}s (cmd={cmd_type})',
             'execution_state': state, 'command_id': cmd_id}
 
 

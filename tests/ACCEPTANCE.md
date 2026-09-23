@@ -1,4 +1,4 @@
-# D6 regression harness and D8 acceptance gates
+# Release candidate regression and acceptance
 
 Run offline unit tests from the repository root:
 
@@ -6,10 +6,7 @@ Run offline unit tests from the repository root:
 py -3.11 -m tests.run
 ```
 
-`PASS` is an observed passing contract. `EXPECTED_FAIL_CONFIRMED_BUG` uses
-`unittest.expectedFailure`: it encodes the desired D7 behavior and must stay red
-on this baseline. An unexpected success fails the suite so the marker is removed
-after the fix. `MANUAL_ACCEPTANCE_REQUIRED` is not counted as a pass. Tests use
+Current suite: **70 tests passed, zero ordinary failures, zero unexpected successes, zero expected failures** on external Python 3.11. Real Abaqus scratch evidence is in [`validation/rc-2026-09-23`](../validation/rc-2026-09-23/summary.json). Doubao Work remains external and unverified. Tests use
 temporary directories; the optional Python matrix command may download packages
 but never changes the checkout `.venv`:
 
@@ -17,10 +14,7 @@ but never changes the checkout `.venv`:
 py -3.11 -m tests.accept_python --candidates
 ```
 
-Observed after D6.1 contract correction: **54** automated tests, **19 PASS**, **35
-EXPECTED_FAIL_CONFIRMED_BUG**, zero ordinary failures. The Python matrix was
-rerun in fresh disposable venvs with `mcp==1.30.0`; the exact JSON output is
-saved in [`python_matrix_d61.json`](python_matrix_d61.json):
+The historical D6.1 Python matrix is saved in [`python_matrix_d61.json`](python_matrix_d61.json). The release support baseline is only external Python 3.11 with `mcp==1.30.0` and importable `FastMCP`:
 
 | Interpreter | Result | Evidence |
 | --- | --- | --- |
@@ -30,10 +24,7 @@ saved in [`python_matrix_d61.json`](python_matrix_d61.json):
 | 3.13 | NOT_AVAILABLE | `py -3.13` unavailable |
 | 3.14 | PROJECT_TESTED_PASS | venv, exact MCP version, `FastMCP`, canonical server load, STDIO handshake and tool discovery |
 
-The tested release baseline remains 3.11. The 3.14 result is local evidence,
-not a change to the supported-version policy. No external Python is rejected
-solely for being 3.10; D7 must identify Abaqus's bundled interpreter by its
-actual executable/path.
+The historical 3.14 experiment does not expand release support. Abaqus's bundled Python stays separate from the external venv.
 
 ## Finding to regression mapping
 

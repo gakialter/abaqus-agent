@@ -21,9 +21,7 @@
 
 ## 外部 Python 隔离
 - Abaqus 自带 Python 是 3.10（`win_b64\tools\SMApy\python3.10\`）。**不要**往它里面 pip install。
-- 外部 MCP server 用系统 Python 建 venv（3.11+）。
-- **必须 `pip install "mcp<2"`**：仓库用的是 FastMCP v1 API；mcp 2.x 已把
-  `mcp.server.fastmcp.FastMCP` 改名/迁移，直接装最新版会 `ModuleNotFoundError`。
+- 外部 MCP server 使用独立 Python 3.11 venv；当前发布基线是 `mcp==1.30.0`，并核对 `FastMCP` 可导入。其他 Python 版本不在本次发布支持范围。
 
 ## 安全边界
 - `execute_script` 在 Abaqus 内核里跑任意 Python——只接可信客户端/可信脚本，别公网暴露。
@@ -31,4 +29,4 @@
   一切装在用户工作目录；用 `ABAQUS_MCP_HOME` 环境变量把 IPC 目录指到隔离工作区。
 
 ## 停掉
-- Abaqus 内核里 `mcp_stop()`，或在 IPC 目录写一个空的 `stop.flag` 文件。
+- 运行仓库根目录的 `stop_mcp.py`；停止请求绑定当前 owner session。旧会话的 `stop.flag` 不会停止新会话。

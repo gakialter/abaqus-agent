@@ -105,24 +105,13 @@ def write_status(status, message=""):
         "mcp_home": MCP_HOME,
         "session_id": _session_id,
     }
-    tmp_file = STATUS_FILE + '.tmp'
-    try:
-        with io.open(tmp_file, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, indent=2)
-        for _ in range(5):
-            try:
-                os.replace(tmp_file, STATUS_FILE)
-                return
-            except Exception:
-                time.sleep(0.02)
-        with io.open(STATUS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, indent=2)
+    for _ in range(5):
         try:
-            os.remove(tmp_file)
-        except Exception:
-            pass
-    except Exception:
-        pass
+            _write_json(STATUS_FILE, payload)
+            return
+        except OSError:
+            time.sleep(0.02)
+    _log('ERROR', 'Could not publish status atomically')
 
 
 def _write_json(path, data):
@@ -543,7 +532,7 @@ def poll_once():
         cmd_path = os.path.join(COMMANDS_DIR, cmd_file)
         claim_path = os.path.join(CLAIMS_DIR, cmd_file)
         try:
-            os.replace(cmd_path, claim_path)
+            os.rename(cmd_path, claim_path)  # Windows rename refuses an existing claim
         except OSError:
             return False  # cancelled or claimed elsewhere
 
@@ -656,8 +645,8 @@ def _start_worker(interval=0.1, mode_name='background'):
         return False
 
     if _mcp_running:
-        print('MCP: Recovering from stale running state')
-        _mcp_running = False
+        print('MCP: Already running in this process')
+        return False
 
     if os.path.exists(STOP_FILE):
         try:
@@ -744,6 +733,9 @@ def mcp_start_timer(interval=0.1):
 def mcp_stop():
     """Stop mcp_loop() or mcp_start()."""
     global _mcp_running, _mcp_thread, _mcp_generation
+    if _owner_handle is None:
+        print('MCP: No active session owned by this process')
+        return False
 
     _mcp_running = False
     _mcp_generation += 1
@@ -766,6 +758,9 @@ def mcp_stop():
 def mcp_loop(sleep_interval=0.1):
     """Blocking loop that continuously processes MCP commands."""
     global _mcp_running, _mcp_commands_processed, _mcp_start_time
+    if _mcp_running:
+        print('MCP: Already running in this process')
+        return False
     if not _acquire_owner():
         print('MCP: BUSY: another consumer owns this MCP_HOME')
         return False
@@ -817,6 +812,9 @@ def mcp_loop(sleep_interval=0.1):
 def mcp_coop_loop(sleep_interval=0.1):
     """Cooperative loop: runs in current thread but yields GUI updates."""
     global _mcp_running, _mcp_commands_processed, _mcp_start_time
+    if _mcp_running:
+        print('MCP: Already running in this process')
+        return False
     if not _acquire_owner():
         print('MCP: BUSY: another consumer owns this MCP_HOME')
         return False

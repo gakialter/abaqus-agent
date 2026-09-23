@@ -19,6 +19,10 @@ def main():
         if not cfg:
             raise ValueError('No Abaqus config. Run install.bat first')
         command = runtime_detection.validate_abaqus_cmd(cfg['ABAQUS_CMD'])
+        if not Path(command).is_absolute():
+            command = runtime_detection.which(command)
+            if not command:
+                raise ValueError('Configured Abaqus command disappeared from PATH')
     except (OSError, ValueError, KeyError) as exc:
         print('[!!] Config: ' + str(exc))
         return 1
@@ -32,9 +36,16 @@ def main():
     env = os.environ.copy()
     env['ABAQUS_MCP_HOME'] = str(REPO / 'mcp_home')
     script = str(REPO / 'abaqus_start_mcp.py')
+    if '%' in script or '%' in command:
+        print('[!!] Percent signs in launcher paths are unsupported by Windows BAT invocation')
+        return 1
     (REPO / 'work').mkdir(exist_ok=True)
     try:
-        subprocess.Popen([command, 'cae', 'script=' + script], cwd=str(REPO / 'work'), env=env,
+        if Path(command).suffix.lower() == '.bat':
+            launch = 'cmd.exe /d /v:off /s /c ""%s" cae "script=%s""' % (command, script)
+        else:
+            launch = [command, 'cae', 'script=' + script]
+        subprocess.Popen(launch, cwd=str(REPO / 'work'), env=env,
                          creationflags=getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
     except OSError as exc:
         print('[!!] Launch failed: ' + str(exc))

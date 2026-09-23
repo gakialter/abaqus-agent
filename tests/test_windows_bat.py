@@ -43,44 +43,39 @@ class WindowsBatBoundary(unittest.TestCase):
                     self.assertEqual(json.loads(log.read_text(encoding="utf-8")),
                                      [str(repo / "scripts" / "bootstrap_windows.py")])
 
-    def test_L6_start_bat_preserves_fake_command_arguments(self):
+    def test_L6_start_helper_preserves_fake_command_arguments(self):
+        from unittest import mock
+        from tests.support import load
         with temp_home() as root:
-            sitecustomize = root / "sitecustomize.py"
-            sitecustomize.write_text("import json,os,sys\nfrom pathlib import Path\n"
-                                    "if Path(sys.executable).name.lower() == 'fake abaqus.exe':\n"
-                                    " Path(os.environ['D6_ARG_LOG']).write_text(json.dumps(sys.argv, ensure_ascii=False), encoding='utf-8')\n"
-                                    " status=Path(os.environ['D6_STATUS_PATH']); status.parent.mkdir(parents=True,exist_ok=True)\n"
-                                    " status.write_text(json.dumps({'status':'running'}, indent=2),encoding='utf-8')\n"
-                                    " os._exit(0)\n", encoding="utf-8")
             for label in self.PATH_CASES:
                 with self.subTest(path=label):
                     repo = root / label
                     repo.mkdir()
                     archive_to(repo)
-                    venv = subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(repo / ".venv")],
-                                          capture_output=True, timeout=25)
-                    self.assertEqual(venv.returncode, 0, venv.stderr[-500:])
                     fake_abq = repo / "fake abaqus.exe"
-                    shutil.copy2(repo / ".venv" / "Scripts" / "python.exe", fake_abq)
-                    shutil.copy2(repo / ".venv" / "pyvenv.cfg", repo / "pyvenv.cfg")
-                    log = root / ("start-" + str(self.PATH_CASES.index(label)) + ".json")
-                    env = {**os.environ, "TEMP": str(root), "TMP": str(root), "PYTHONPATH": str(root),
-                           "D6_ARG_LOG": str(log),
-                           "D6_STATUS_PATH": str(repo / "mcp_home" / "status.json"),
-                           "ABAQUS_CMD": str(fake_abq)}
+                    fake_abq.write_bytes(b"fake")
                     (repo / ".abaqus-agent.json").write_text(
                         json.dumps({"schema_version": 1, "ABAQUS_CMD": str(fake_abq)}), encoding="utf-8")
-                    proc = subprocess.Popen(["cmd.exe", "/d", "/c", "call", str(repo / "start_abaqus_agent.bat")],
-                                            cwd=repo, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                            creationflags=subprocess.CREATE_NO_WINDOW)
-                    try:
-                        import time
-                        deadline = time.monotonic() + 10
-                        while not log.exists() and time.monotonic() < deadline:
-                            time.sleep(.05)
-                        self.assertTrue(log.exists(), "launcher never called fake Abaqus; process=" + str(proc.poll()))
-                    finally:
-                        proc.kill()
-                        proc.communicate(timeout=5)
-                    self.assertEqual(json.loads(log.read_text(encoding="utf-8")),
-                                     ["cae", "script=" + str(repo / "abaqus_start_mcp.py")])
+                    helper = load("start_" + str(len(label)), "scripts/start_windows.py")
+                    states = iter(("STOPPED", "BRIDGE_READY"))
+                    with mock.patch.object(helper, "REPO", repo), \
+                         mock.patch.object(helper.bridge_state, "state", side_effect=lambda: next(states)), \
+                         mock.patch.object(helper.subprocess, "Popen") as launched:
+                        self.assertEqual(helper.main(), 0)
+                    args, kwargs = launched.call_args
+                    self.assertEqual(args[0], [str(fake_abq), "cae", "script=" + str(repo / "abaqus_start_mcp.py")])
+                    self.assertEqual(kwargs["env"]["ABAQUS_MCP_HOME"], str(repo / "mcp_home"))
+                    self.assertEqual(kwargs["cwd"], str(repo / "work"))
+
+    def test_L6_bat_launch_quotes_spaces_chinese_and_ampersand(self):
+        with temp_home() as root:
+            repo = root / '中文 & Abaqus Agent'
+            repo.mkdir()
+            fake = repo / 'fake & Abaqus.bat'
+            fake.write_text('@echo off\necho %1 %2\n', encoding='ascii')
+            script = repo / 'abaqus_start_mcp.py'
+            launch = 'cmd.exe /d /v:off /s /c ""%s" cae "script=%s""' % (fake, script)
+            result = subprocess.run(launch, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(str(script).encode('utf-8'), result.stdout)
+            self.assertIn(b'cae', result.stdout)
