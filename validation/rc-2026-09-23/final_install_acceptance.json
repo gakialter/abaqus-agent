@@ -1,0 +1,13 @@
+{
+  "source_head": "aa3dbd5",
+  "install_exit": 0,
+  "python": "3.11.9",
+  "mcp": "1.30.0",
+  "doctor_before": "INSTALLED=true; BRIDGE_READY=false (STOPPED); INTEGRATION_READY=EXTERNAL/UNVERIFIED",
+  "doctor_after": "INSTALLED=true\r\nBRIDGE_READY=true (BRIDGE_READY)\r\nINTEGRATION_READY=EXTERNAL/UNVERIFIED (requires real MCP host test)\r\n",
+  "doctor_after_exit": 0,
+  "final_zip_path_contains_spaces_chinese_ampersand": true,
+  "fresh_start": "BRIDGE_READY after owner/status/ping agreement",
+  "already_running_start": "BRIDGE_READY: existing session; no second launch",
+  "capture_wrapper_timeout": "Python subprocess.run(capture_output=True) retained child pipe until CAE closed; direct doctor and ping succeeded"
+}

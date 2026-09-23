@@ -30,5 +30,6 @@
   "two_named_contact_interactions": "PASS: Cont1 and Cont2 in one completed ODB; two CPRESS and two COPEN surface-pair keys; selected second exact key",
   "doubao_work": "UNVERIFIED; no configuration written",
   "epp_output": "LE and PEEQ present; E absent despite request",
-  "screenshot_formats": "PNG .png image/png, SVG .svg image/svg+xml, TIFF .tif image/tiff; TIF and JPEG rejected"
+  "screenshot_formats": "PNG .png image/png, SVG .svg image/svg+xml, TIFF .tif image/tiff; TIF and JPEG rejected",
+  "final_clean_zip_install": "PASS from aa3dbd5, path includes Chinese, spaces and ampersand; Python 3.11.9, mcp 1.30.0, FastMCP; doctor INSTALLED=true before start and BRIDGE_READY=true after real ping"
 }
