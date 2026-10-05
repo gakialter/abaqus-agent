@@ -6,7 +6,25 @@ File IPC bridge for local Abaqus/CAE 2026. External Python 3.11 uses `mcp==1.30.
 
 Download the ZIP, extract it to a writable location, then run `install.bat`, `doctor.bat`, and `start_abaqus_agent.bat` in that order. `doctor.bat` reports `INSTALLED`, `BRIDGE_READY`, and `INTEGRATION_READY` separately. Before startup, `INSTALLED=true` can coexist with `BRIDGE_READY=false`.
 
-Import `SKILL.md` with its `references/` directory through the MCP host's supported Skill UI. Configure a local STDIO MCP connector with:
+Import `SKILL.md` with its `references/` directory through the MCP host's supported Skill UI. For Codex, register the local STDIO server from PowerShell after installation (replace the path if the repository is elsewhere):
+
+```powershell
+codex mcp add abaqus-agent `
+  --env "ABAQUS_MCP_HOME=C:\path\to\abaqus-agent\mcp_home" `
+  -- "C:\path\to\abaqus-agent\.venv\Scripts\python.exe" `
+     "C:\path\to\abaqus-agent\mcp_server.py"
+codex mcp list
+```
+
+To make Codex discover the project guidance in `SKILL.md` automatically, create a directory junction once from the repository root:
+
+```powershell
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.codex\skills\abaqus-agent" `
+  -Target (Get-Location).Path
+```
+
+The server should appear as enabled. Start a new Codex session (or restart the desktop app) to load the newly registered tools and skill, then ask Codex to list or use the Abaqus MCP tools. Tool discovery only confirms that the MCP server started; `ping` requires Abaqus/CAE to be open with the bridge plugin running. Other MCP hosts can use the same command, argument, and environment values:
 
 | Field | Value |
 |---|---|

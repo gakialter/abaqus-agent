@@ -1,18 +1,49 @@
 {
-  "timestamp": "2026-09-22T00:11:31+08:00",
-  "abaqus_version": "2026",
-  "bridge_version": "4.0.0",
-  "job_name": "CantileverJob",
+  "timestamp": "2026-09-23T11:52:13.402955+00:00",
+  "abaqus": "2026",
+  "bridge_status_before": {
+    "status": "running",
+    "message": "Polling active | cmds=31 uptime=3755s",
+    "version": "4.0.0",
+    "timestamp": 1790164332.6194363,
+    "datetime": "2026-09-23 19:52:12",
+    "pid": 16648,
+    "mcp_home": "C:\\Users\\27296\\Desktop\\abaqus-agent\\mcp_home",
+    "session_id": "7b932f018b5b40f79a20593886504c1d"
+  },
+  "ping": {
+    "id": "2b9134a982ce4fcdbffeb10a3ff0330c",
+    "success": true,
+    "timestamp": 1790164333.487108,
+    "data": {
+      "response": "pong",
+      "version": "4.0.0",
+      "session_id": "7b932f018b5b40f79a20593886504c1d"
+    }
+  },
+  "build_success": true,
+  "build_output": "BUILD_OK",
+  "submit": {
+    "id": "1c7b4ceb4a314606939fbb233956e924",
+    "success": true,
+    "timestamp": 1790164333.7666163,
+    "data": {
+      "success": true,
+      "job": "CantileverJob",
+      "status": "COMPLETED",
+      "error": null
+    }
+  },
   "job_status": "COMPLETED",
-  "max_disp_mm": 0.40274,
-  "max_mises_MPa": 100.206,
+  "job_success_flag": true,
+  "odb_output": "ODB_RESULT {\"max_disp\": 0.40274, \"max_mises\": 100.206}",
+  "odb_success": true,
+  "max_disp": 0.40274,
+  "max_mises": 100.206,
+  "contour_output": "contour warn: 主变量 无法获取: 'S' 在单元结点处.\nCONTOUR_OK",
+  "viewport_success": true,
+  "screenshot_path": "C:\\Users\\27296\\Desktop\\abaqus-agent\\validation\\result_screenshot.png",
+  "screenshot_bytes": 57575,
   "physics_sane": true,
-  "screenshot_path": "validation/result_screenshot.png",
-  "screenshot_size_bytes": 57584,
-  "ping_ok": true,
-  "build_ok": true,
-  "odb_read_ok": true,
-  "viewport_ok": true,
-  "overall_pass": true,
-  "notes": "Cantilever beam 100x10x10mm, Steel E=210000MPa nu=0.3, 50N corner loads. Tip displacement ~0.40mm, fixed-end Mises ~100MPa — matches hand-calc order of magnitude."
+  "overall_pass": true
 }
